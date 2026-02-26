@@ -1,0 +1,17 @@
+{
+  "name": "@warmpath/server",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "hono": "^4.9.7"
+  },
+  "devDependencies": {
+    "bun-types": "^1.2.22",
+    "typescript": "^5.9.2"
+  }
+}
