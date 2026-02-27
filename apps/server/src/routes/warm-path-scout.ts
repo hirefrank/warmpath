@@ -7,7 +7,8 @@ import {
   listScoutDiagnosticsSummariesByRunIds,
   listScoutRuns,
 } from "../db/repositories/second-degree-scout";
-import { createScoutProviderChainFromEnv } from "../lib/scout/scout-provider-chain";
+import { getScoutRuntimeSettings } from "../db/repositories/app-settings";
+import { createScoutProviderChain } from "../lib/scout/scout-provider-chain";
 import { runSecondDegreeScout } from "../lib/scout/second-degree-scout";
 import { saveEvent } from "../db/repositories/warm-path-runs";
 import type { SecondDegreeScoutRequest } from "../../../../packages/shared/src/contracts/scout";
@@ -24,8 +25,11 @@ app.post("/api/warm-path/scout/run", async (c) => {
       return c.json({ error: validationError }, 400);
     }
 
+    const database = getDatabase();
+    const runtimeSettings = getScoutRuntimeSettings(database);
+
     const result = await runSecondDegreeScout(
-      getDatabase(),
+      database,
       {
         target_company: body.target_company!.trim(),
         target_function: body.target_function?.trim() || undefined,
@@ -33,7 +37,16 @@ app.post("/api/warm-path/scout/run", async (c) => {
         limit: body.limit,
         seed_targets: body.seed_targets,
       },
-      createScoutProviderChainFromEnv()
+      createScoutProviderChain({
+        linkedInLiAt: runtimeSettings.linkedInLiAt,
+        linkedInRateLimitMs: runtimeSettings.linkedInRateLimitMs,
+        linkedInRequestTimeoutMs: runtimeSettings.linkedInRequestTimeoutMs,
+        providerOrder: runtimeSettings.scoutProviderOrder,
+        staticTargetsJson: runtimeSettings.scoutStaticTargetsJson,
+      }),
+      {
+        minTargetConfidence: runtimeSettings.scoutMinTargetConfidence,
+      }
     );
 
     trackScoutEvent(result.run.id, result.run.status);

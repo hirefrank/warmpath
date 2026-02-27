@@ -19,6 +19,9 @@ import type {
   OutreachBriefResponse,
   RankedPath,
   Reminder,
+  WarmPathSettings,
+  WarmPathSettingsResponse,
+  WarmPathSettingsUpdateRequest,
   WorkflowSnapshotResponse,
 } from "@warmpath/shared/contracts/warm-path";
 
@@ -88,6 +91,26 @@ export async function listJobs(filters: {
 
   const payload = (await response.json()) as { jobs: NormalizedJob[] };
   return payload.jobs;
+}
+
+export async function getWarmPathSettings(): Promise<WarmPathSettingsResponse> {
+  const response = await fetch(`${API_BASE}/api/warm-path/settings`);
+  await assertOk(response, "Failed to load settings");
+  return response.json();
+}
+
+export async function updateWarmPathSettings(
+  settings: Partial<WarmPathSettings>
+): Promise<WarmPathSettingsResponse> {
+  const payload: WarmPathSettingsUpdateRequest = { settings };
+  const response = await fetch(`${API_BASE}/api/warm-path/settings`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  await assertOk(response, "Failed to update settings");
+  return response.json();
 }
 
 export async function rankWarmPaths(input: {

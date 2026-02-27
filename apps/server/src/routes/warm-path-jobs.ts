@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { fetchNetworkJobs } from "../lib/job-sources/network-jobs";
 import { fetchAllJobs } from "../lib/job-sources/all-jobs";
 import { getDatabase } from "../db";
+import { getWarmPathSettings } from "../db/repositories/app-settings";
 import { listJobs, upsertJobs } from "../db/repositories/jobs-cache";
 
 const app = new Hono();
@@ -10,22 +11,24 @@ app.post("/api/warm-path/jobs/sync", async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
     const source = body.source === "all" ? "all" : "network";
-    const advisorSlug = String(body.advisor_slug ?? "hirefrank");
+    const database = getDatabase();
+    const settings = getWarmPathSettings(database).settings;
+    const advisorSlug = String(body.advisor_slug ?? settings.advisor_slug);
+    const category = body.category ?? settings.default_job_category;
 
     const jobs = source === "all"
       ? await fetchAllJobs({
-        category: body.category,
+        category,
         location: body.location,
         seniority: body.seniority,
       })
       : await fetchNetworkJobs({
         advisorSlug,
-        category: body.category,
+        category,
         location: body.location,
         seniority: body.seniority,
       });
 
-    const database = getDatabase();
     upsertJobs(database, jobs);
     const totalCached = listJobs(database, { advisorSlug, source, limit: 5000 }).length;
 

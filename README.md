@@ -2,7 +2,9 @@
 
 Find the best warm path into a job, then execute outreach with structure.
 
-## What this is (plain English)
+![WarmPath screenshot](docs/screenshot.png)
+
+## What this is
 
 Job hunting is usually noisy:
 
@@ -13,15 +15,15 @@ Job hunting is usually noisy:
 
 WarmPath helps you do this in a repeatable way.
 
-You import contacts, choose a job, and WarmPath ranks who in your network is the strongest connector. Then it generates outreach materials (brief, email, DM, follow-up plan), tracks what happened, and learns from outcomes.
+You import contacts, choose a job, and WarmPath ranks who in your network is the strongest connector. Then it generates outreach materials, tracks what happened, and learns from outcomes.
 
 Everything runs locally on your machine by default.
 
-## How it works (plain English)
+## How it works
 
-1. **Scout** possible paths to target companies and roles (including second-degree candidates).
-2. **Rank** connectors by weighted signals (company affinity, role relevance, relationship strength, context, confidence).
-3. **Generate** structured outreach assets (briefs, message variants, distribution artifacts).
+1. **Scout** possible paths to target companies and roles, including second-degree candidates.
+2. **Rank** connectors by weighted signals: company affinity, role relevance, relationship strength, context, and confidence.
+3. **Generate** structured outreach assets: briefs, message variants, and distribution artifacts.
 4. **Track** workflow status and reminders so outreach does not fall through.
 5. **Learn** from outcomes and auto-tune ranking weights over time.
 
@@ -30,9 +32,9 @@ Everything runs locally on your machine by default.
 - Reachable-now lane: rank direct warm connectors for selected jobs
 - Build-a-path lane: scout second-degree targets and connector paths
 - Structured outreach brief generation with trust/safety guardrails
-- Message packs (email + DM + follow-up variants)
-- Workflow tracking + reminder scheduling
-- Learning loop + auto-tuned scoring profile
+- Message packs with email, DM, and follow-up variants
+- Workflow tracking and reminder scheduling
+- Learning loop with auto-tuned scoring profile
 - Distribution pack export modes:
   - machine-readable JSON bundle
   - markdown playbook
@@ -50,10 +52,10 @@ Everything runs locally on your machine by default.
 # 1) install dependencies
 bun install
 
-# 2) start API server (terminal A)
+# 2) start API server
 bun run dev:server
 
-# 3) start client (terminal B)
+# 3) start client
 bun run dev:client
 ```
 
@@ -62,23 +64,17 @@ Open:
 - App: [http://localhost:5173](http://localhost:5173)
 - API health: [http://localhost:3001/api/health](http://localhost:3001/api/health)
 
-### Single-origin mode (Backchannel-style)
+### Single-origin mode
 
-If you want one origin (same host/port for UI + API), use:
+If you want one origin for UI and API:
 
 ```bash
 bun run dev:single-origin
 ```
 
-Then open:
+Then open [http://localhost:3001](http://localhost:3001).
 
-- App + API: [http://localhost:3001](http://localhost:3001)
-
-Notes:
-
-- This builds the client and serves static assets from the Hono server.
-- Great for local production-like behavior.
-- For fastest UI iteration/HMR, keep using dual-process dev (`dev:client` + `dev:server`).
+This builds the client and serves static assets from the Hono server. For fastest UI iteration with HMR, keep using dual-process dev.
 
 ### One-command demo
 
@@ -86,7 +82,7 @@ Notes:
 bun run demo
 ```
 
-## Setup Details (clear checklist)
+## Setup Details
 
 1. Install Bun.
 2. Clone this repo.
@@ -94,7 +90,7 @@ bun run demo
 4. Start server: `bun run dev:server`.
 5. Start client: `bun run dev:client`.
 6. Open `http://localhost:5173`.
-7. (Optional) Import LinkedIn contacts CSV.
+7. Import LinkedIn contacts CSV.
 8. Pick a job, rank paths, and generate outreach assets.
 
 If you only need local/offline behavior, you can run without LinkedIn session config.
@@ -103,18 +99,18 @@ If you only need local/offline behavior, you can run without LinkedIn session co
 
 ### Core
 
-- `WARMPATH_DB_PATH` (optional): override SQLite file path (default `warmpath.db` in repo root).
+- `WARMPATH_DB_PATH`: override SQLite file path. Default is `warmpath.db` in repo root.
 
 ### LinkedIn + Scout
 
 - `LINKEDIN_LI_AT`: LinkedIn session cookie for live 2nd-degree discovery.
-- `LINKEDIN_RATE_LIMIT_MS` (optional, default `1200`)
-- `LINKEDIN_REQUEST_TIMEOUT_MS` (optional, default `15000`)
-- `SCOUT_MIN_TARGET_CONFIDENCE` (optional, default `0.45`)
-- `SCOUT_STATIC_TARGETS_JSON` (optional): fallback targets for local/non-LinkedIn scouting.
-- `SCOUT_PROVIDER_ORDER` (optional, default `linkedin_li_at,static_seed`)
+- `LINKEDIN_RATE_LIMIT_MS`: default `1200`
+- `LINKEDIN_REQUEST_TIMEOUT_MS`: default `15000`
+- `SCOUT_MIN_TARGET_CONFIDENCE`: default `0.45`
+- `SCOUT_STATIC_TARGETS_JSON`: fallback targets for local/non-LinkedIn scouting.
+- `SCOUT_PROVIDER_ORDER`: default `linkedin_li_at,static_seed`
 
-### Scout v2 score weight overrides (optional)
+### Scout v2 score weight overrides
 
 - `SCOUT_V2_WEIGHT_COMPANY_ALIGNMENT`
 - `SCOUT_V2_WEIGHT_ROLE_ALIGNMENT`
@@ -129,7 +125,7 @@ Without valid `LINKEDIN_LI_AT`, scout runs still work with seed/static targets a
 ## Development Commands
 
 ```bash
-# single-origin local runtime (build client, serve both from :3001)
+# single-origin local runtime
 bun run dev:single-origin
 
 # type checks
@@ -149,9 +145,7 @@ bun run --cwd apps/server test src/routes/warm-path-runs.route.test.ts -t "gener
 bun run --cwd apps/client build
 ```
 
-Note: there is currently no dedicated lint script; typecheck + tests + build are the quality gates.
-
-## API Overview (Release 3)
+## API Overview
 
 Warm-path core:
 
@@ -186,10 +180,7 @@ Scout + jobs + contacts:
 - `GET /api/warm-path/scout/runs/:id`
 - `GET /api/warm-path/scout/stats`
 
-See:
-
-- `docs/release-3-api.md`
-- `docs/release-notes.md`
+See `docs/release-3-api.md` and `docs/release-notes.md` for details.
 
 ## Project Structure
 
@@ -203,11 +194,11 @@ warmpath/
 └── docs/                 # Plans, API reference, release notes
 ```
 
-## Local-First and Safety Notes
+## Local-First and Safety
 
 - Data is stored in local SQLite by default.
 - Draft context guardrails block unsafe instructions.
-- Raw emails/phones/LinkedIn URLs in context are sanitized and surfaced as warnings.
+- Raw emails, phones, and LinkedIn URLs in context are sanitized and surfaced as warnings.
 
 ## License
 

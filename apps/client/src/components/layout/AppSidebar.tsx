@@ -1,8 +1,8 @@
-import { Search, Users, Briefcase, GitBranch, BarChart3, FileText } from "lucide-react";
+import { Search, Users, Briefcase, GitBranch, BarChart3, FileText, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
-export type WorkflowStep = "scout" | "import" | "jobs" | "buildPath" | "rank" | "draft";
+export type WorkflowStep = "settings" | "scout" | "import" | "jobs" | "buildPath" | "rank" | "draft";
 
 interface AppSidebarProps {
   activeStep: WorkflowStep;
@@ -12,9 +12,11 @@ interface AppSidebarProps {
   buildPathCount: number;
   pathCount: number;
   hasDraft: boolean;
+  settingsReady: boolean;
 }
 
 const steps: { id: WorkflowStep; label: string; icon: typeof Search; description: string }[] = [
+  { id: "settings", label: "Settings", icon: Settings2, description: "Configure once" },
   { id: "scout", label: "Scout", icon: Search, description: "Find 2nd-degree targets" },
   { id: "import", label: "Contacts", icon: Users, description: "Import your network" },
   { id: "jobs", label: "Jobs", icon: Briefcase, description: "Pick target roles" },
@@ -26,6 +28,8 @@ const steps: { id: WorkflowStep; label: string; icon: typeof Search; description
 export function AppSidebar(props: AppSidebarProps) {
   function getBadge(id: WorkflowStep): string | null {
     switch (id) {
+      case "settings":
+        return props.settingsReady ? "Ready" : null;
       case "import":
         return props.contactCount > 0 ? String(props.contactCount) : null;
       case "jobs":

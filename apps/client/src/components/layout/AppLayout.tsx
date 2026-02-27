@@ -10,6 +10,7 @@ interface AppLayoutProps {
   buildPathCount: number;
   pathCount: number;
   hasDraft: boolean;
+  settingsReady: boolean;
   children: ReactNode;
 }
 
@@ -24,6 +25,7 @@ export function AppLayout(props: AppLayoutProps) {
         buildPathCount={props.buildPathCount}
         pathCount={props.pathCount}
         hasDraft={props.hasDraft}
+        settingsReady={props.settingsReady}
       />
       <ScrollArea className="flex-1 bg-grain">
         <div

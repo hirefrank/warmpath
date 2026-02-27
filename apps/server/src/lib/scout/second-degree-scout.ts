@@ -780,6 +780,27 @@ function loadScoutV2WeightsFromEnv(): ScoutV2Weights {
     safety: parseWeight(process.env.SCOUT_V2_WEIGHT_SAFETY, DEFAULT_SCOUT_V2_WEIGHTS.safety),
   };
 
+  return normalizeScoutV2Weights(raw);
+}
+
+function resolveScoutV2Weights(overrides?: Partial<ScoutV2Weights>): ScoutV2Weights {
+  if (!overrides) {
+    return loadScoutV2WeightsFromEnv();
+  }
+
+  const base = loadScoutV2WeightsFromEnv();
+  return normalizeScoutV2Weights({
+    company_alignment: clampWeightNumber(overrides.company_alignment, base.company_alignment),
+    role_alignment: clampWeightNumber(overrides.role_alignment, base.role_alignment),
+    relationship: clampWeightNumber(overrides.relationship, base.relationship),
+    connector_influence: clampWeightNumber(overrides.connector_influence, base.connector_influence),
+    target_confidence: clampWeightNumber(overrides.target_confidence, base.target_confidence),
+    ask_fit: clampWeightNumber(overrides.ask_fit, base.ask_fit),
+    safety: clampWeightNumber(overrides.safety, base.safety),
+  });
+}
+
+function normalizeScoutV2Weights(raw: ScoutV2Weights): ScoutV2Weights {
   const total =
     raw.company_alignment +
     raw.role_alignment +
@@ -812,6 +833,14 @@ function parseWeight(value: string | undefined, fallback: number): number {
   }
 
   return Math.max(0, Math.min(100, parsed));
+}
+
+function clampWeightNumber(value: number | undefined, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.max(0, Math.min(100, value));
 }
 
 function clampLimit(limit: number): number {
@@ -875,5 +904,9 @@ function parseMinConfidence(value: string | undefined): number {
   if (!Number.isFinite(parsed)) {
     return DEFAULT_MIN_TARGET_CONFIDENCE;
   }
-  return Math.max(0, Math.min(1, parsed));
+  return parseMinConfidenceValue(parsed);
+}
+
+function parseMinConfidenceValue(value: number): number {
+  return Math.max(0, Math.min(1, value));
 }

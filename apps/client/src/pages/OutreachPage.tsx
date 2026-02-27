@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { JobPicker } from "../components/outreach/JobPicker";
 import { ContactsImportPanel } from "../components/outreach/ContactsImportPanel";
 import { ScoutPanel } from "../components/outreach/ScoutPanel";
+import { SettingsPanel } from "../components/outreach/SettingsPanel";
 import { BuildPathPanel, type BuildPathCandidate } from "../components/outreach/BuildPathPanel";
 import { RankedPathsList } from "../components/outreach/RankedPathsList";
 import { IntroDraftPanel } from "../components/outreach/IntroDraftPanel";
@@ -10,6 +11,7 @@ import type { WorkflowStep } from "../components/layout/AppSidebar";
 import {
   autoTuneLearning,
   generateDistributionPack,
+  getWarmPathSettings,
   getLearningSummary,
   generateMessagePack,
   generateOutreachBrief,
@@ -27,6 +29,7 @@ import {
   scheduleReminder,
   syncJobs,
   trackWorkflowStatus,
+  updateWarmPathSettings,
   updateReminder,
 } from "../lib/api";
 import type { NormalizedJob } from "@warmpath/shared/contracts/job";
@@ -45,11 +48,13 @@ import type {
   OutreachWorkflowStatus,
   OutreachBriefResponse,
   RankedPath,
+  WarmPathSettings,
+  WarmPathSettingsResponse,
   WorkflowSnapshotResponse,
 } from "@warmpath/shared/contracts/warm-path";
 
 export function OutreachPage() {
-  const [activeStep, setActiveStep] = useState<WorkflowStep>("scout");
+  const [activeStep, setActiveStep] = useState<WorkflowStep>("settings");
   const [jobs, setJobs] = useState<NormalizedJob[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [paths, setPaths] = useState<RankedPath[]>([]);
@@ -73,6 +78,7 @@ export function OutreachPage() {
   const [draftAppliedContext, setDraftAppliedContext] = useState<string | null>(null);
   const [draftAppliedContextSource, setDraftAppliedContextSource] = useState<"build_path" | "manual" | null>(null);
   const [workflowSnapshot, setWorkflowSnapshot] = useState<WorkflowSnapshotResponse | null>(null);
+  const [settings, setSettings] = useState<WarmPathSettingsResponse | null>(null);
   const [learningSummary, setLearningSummary] = useState<LearningSummaryResponse | null>(null);
   const [draftTone, setDraftTone] = useState<"warm" | "concise" | "direct">("warm");
   const [isSyncing, setIsSyncing] = useState(false);
@@ -84,10 +90,12 @@ export function OutreachPage() {
   const [isGeneratingDistributionPack, setIsGeneratingDistributionPack] = useState(false);
   const [isUpdatingWorkflow, setIsUpdatingWorkflow] = useState(false);
   const [isUpdatingLearning, setIsUpdatingLearning] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isDrafting, setIsDrafting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    void refreshSettings();
     void refreshJobs();
     void refreshContacts();
     void refreshScoutRuns();
@@ -95,9 +103,19 @@ export function OutreachPage() {
     void refreshLearningSummary();
   }, []);
 
-  async function refreshJobs(): Promise<void> {
+  async function refreshSettings(): Promise<void> {
     try {
-      const result = await listJobs({ advisor_slug: "hirefrank", limit: 200 });
+      const next = await getWarmPathSettings();
+      setSettings(next);
+      await refreshJobs(next.settings.advisor_slug);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function refreshJobs(advisorSlug: string = settings?.settings.advisor_slug ?? "hirefrank"): Promise<void> {
+    try {
+      const result = await listJobs({ advisor_slug: advisorSlug, limit: 200 });
       setJobs(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -140,11 +158,28 @@ export function OutreachPage() {
     }
   }
 
+  async function handleSaveSettings(patch: Partial<WarmPathSettings>): Promise<void> {
+    setError(null);
+    setIsSavingSettings(true);
+    try {
+      const result = await updateWarmPathSettings(patch);
+      setSettings(result);
+      await refreshJobs(result.settings.advisor_slug);
+      setActiveStep("scout");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsSavingSettings(false);
+    }
+  }
+
   async function handleSync(): Promise<void> {
     setError(null);
     setIsSyncing(true);
     try {
-      await syncJobs({ advisor_slug: "hirefrank", category: "product", source: "network" });
+      const advisorSlug = settings?.settings.advisor_slug ?? "hirefrank";
+      const category = settings?.settings.default_job_category ?? "product";
+      await syncJobs({ advisor_slug: advisorSlug, category, source: "network" });
       await refreshJobs();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -158,8 +193,9 @@ export function OutreachPage() {
     setError(null);
     setIsRanking(true);
     try {
+      const advisorSlug = settings?.settings.advisor_slug ?? "hirefrank";
       const result = await rankWarmPaths({
-        advisor_slug: "hirefrank",
+        advisor_slug: advisorSlug,
         job_cache_id: selectedJobId,
       });
       setRunId(result.run_id);

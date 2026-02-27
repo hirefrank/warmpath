@@ -11,6 +11,7 @@ import {
   getActiveScoringWeights,
   recordLearningFeedback,
 } from "../db/repositories/learning";
+import { getWarmPathSettings } from "../db/repositories/app-settings";
 import {
   addReminder,
   addWorkflowEntry,
@@ -50,7 +51,8 @@ app.post("/api/warm-path/rank", async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
     const runId = crypto.randomUUID();
-    const advisorSlug = String(body.advisor_slug ?? "hirefrank");
+    const settings = getWarmPathSettings(getDatabase()).settings;
+    const advisorSlug = String(body.advisor_slug ?? settings.advisor_slug);
     const jobCacheId = body.job_cache_id ? String(body.job_cache_id) : undefined;
     const inputSignals = Array.isArray(body.contact_signals)
       ? (body.contact_signals as ContactSignals[])
