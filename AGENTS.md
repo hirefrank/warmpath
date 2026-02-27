@@ -76,11 +76,6 @@ bun run --cwd apps/server test src/routes/warm-path-runs.route.test.ts -t "gener
 bun run --cwd apps/client build
 ```
 
-### Run demo flow
-```bash
-bun run demo
-```
-
 ## Linting
 - No dedicated lint script exists in root/workspace `package.json` files.
 - Current quality gates: TypeScript checks + server tests + client build.

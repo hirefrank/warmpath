@@ -27,19 +27,6 @@ Everything runs locally on your machine by default.
 4. **Track** workflow status and reminders so outreach does not fall through.
 5. **Learn** from outcomes and auto-tune ranking weights over time.
 
-## Key Features
-
-- Reachable-now lane: rank direct warm connectors for selected jobs
-- Build-a-path lane: scout second-degree targets and connector paths
-- Structured outreach brief generation with trust/safety guardrails
-- Message packs with email, DM, and follow-up variants
-- Workflow tracking and reminder scheduling
-- Learning loop with auto-tuned scoring profile
-- Distribution pack export modes:
-  - machine-readable JSON bundle
-  - markdown playbook
-  - CRM-ready note
-
 ## Quick Start
 
 ### Prerequisites
@@ -52,91 +39,59 @@ Everything runs locally on your machine by default.
 # 1) install dependencies
 bun install
 
-# 2) start single-origin app (UI + API)
+# 2) start WarmPath
 bun run dev
 ```
 
-Open:
+Open [http://localhost:3001](http://localhost:3001).
 
-- App + API: [http://localhost:3001](http://localhost:3001)
+### Getting started
 
-### Single-origin mode
-
-If you want one origin for UI and API:
-
-```bash
-bun run dev
-```
-
-Then open [http://localhost:3001](http://localhost:3001).
-
-This builds the client and serves static assets from the Hono server.
-For fastest UI iteration with HMR, use dual-process dev:
-
-```bash
-bun run dev:server
-bun run dev:client
-```
-
-### One-command demo
-
-```bash
-bun run demo
-```
-
-## Setup Details
-
-1. Install Bun.
-2. Clone this repo.
-3. Run `bun install` from repo root.
-4. Start app: `bun run dev`.
-5. Open `http://localhost:3001`.
-6. Go to **Settings** and save your defaults and (optionally) LinkedIn cookie.
-7. Import LinkedIn contacts CSV.
-8. Pick a job, rank paths, and generate outreach assets.
+1. Go to **Settings** and save your profile name and (optionally) LinkedIn session cookie.
+2. Import your LinkedIn contacts CSV.
+3. Pick a job, rank paths, and generate outreach assets.
 
 If you only need local/offline behavior, you can run without LinkedIn session config.
 
-## Configuration
+## Project Structure
 
-For non-technical users, configure defaults in the in-app **Settings** panel.
-Environment variables are optional advanced overrides.
+```text
+warmpath/
+├── apps/
+│   ├── server/           # Hono API, repositories, scoring, route tests
+│   └── client/           # React UI, sidebar workflow, API wrappers
+├── packages/
+│   └── shared/           # Cross-app TypeScript contracts
+└── docs/                 # Plans, API reference, release notes
+```
 
-### Core
+## Local-First and Safety
 
-- `WARMPATH_DB_PATH`: override SQLite file path. Default is `warmpath.db` in repo root.
+- Data is stored in local SQLite by default.
+- Draft context guardrails block unsafe instructions.
+- Raw emails, phones, and LinkedIn URLs in context are sanitized and surfaced as warnings.
 
-### LinkedIn + Scout
+## License
 
-- `LINKEDIN_LI_AT`: LinkedIn session cookie for live 2nd-degree discovery.
-- `LINKEDIN_RATE_LIMIT_MS`: default `1200`
-- `LINKEDIN_REQUEST_TIMEOUT_MS`: default `15000`
-- `SCOUT_MIN_TARGET_CONFIDENCE`: default `0.45`
-- `SCOUT_STATIC_TARGETS_JSON`: fallback targets for local/non-LinkedIn scouting.
-- `SCOUT_PROVIDER_ORDER`: default `linkedin_li_at,static_seed`
+MIT
 
-### Scout v2 score weight overrides
+---
 
-- `SCOUT_V2_WEIGHT_COMPANY_ALIGNMENT`
-- `SCOUT_V2_WEIGHT_ROLE_ALIGNMENT`
-- `SCOUT_V2_WEIGHT_RELATIONSHIP`
-- `SCOUT_V2_WEIGHT_CONNECTOR_INFLUENCE`
-- `SCOUT_V2_WEIGHT_TARGET_CONFIDENCE`
-- `SCOUT_V2_WEIGHT_ASK_FIT`
-- `SCOUT_V2_WEIGHT_SAFETY`
+<details>
+<summary><strong>Appendix: Developer Reference</strong></summary>
 
-Without valid `LINKEDIN_LI_AT`, scout runs still work with seed/static targets and may return `needs_adapter` for live discovery.
+### Dual-process dev (frontend hot reload)
 
-## Development Commands
+For fastest UI iteration with HMR, run the server and client separately:
 
 ```bash
-# single-origin local runtime
-bun run dev
+bun run dev:server   # API on http://localhost:3001
+bun run dev:client   # UI on http://localhost:5173
+```
 
-# dual-process dev (client HMR)
-bun run dev:server
-bun run dev:client
+### Development commands
 
+```bash
 # type checks
 bun run typecheck:server
 bun run typecheck:client
@@ -154,7 +109,7 @@ bun run --cwd apps/server test src/routes/warm-path-runs.route.test.ts -t "gener
 bun run --cwd apps/client build
 ```
 
-## API Overview
+### API overview
 
 Warm-path core:
 
@@ -193,24 +148,26 @@ Scout + jobs + contacts:
 
 See `docs/release-3-api.md` and `docs/release-notes.md` for details.
 
-## Project Structure
+### Environment variable overrides
 
-```text
-warmpath/
-├── apps/
-│   ├── server/           # Hono API, repositories, scoring, route tests
-│   └── client/           # React UI, sidebar workflow, API wrappers
-├── packages/
-│   └── shared/           # Cross-app TypeScript contracts
-└── docs/                 # Plans, API reference, release notes
-```
+Most settings are configurable in the in-app **Settings** panel. These environment variables are optional advanced overrides:
 
-## Local-First and Safety
+- `WARMPATH_DB_PATH`: override SQLite file path (default: `warmpath.db` in repo root)
+- `LINKEDIN_LI_AT`: LinkedIn session cookie
+- `LINKEDIN_RATE_LIMIT_MS`: default `1200`
+- `LINKEDIN_REQUEST_TIMEOUT_MS`: default `15000`
+- `SCOUT_MIN_TARGET_CONFIDENCE`: default `0.45`
+- `SCOUT_STATIC_TARGETS_JSON`: fallback targets for local/non-LinkedIn scouting
+- `SCOUT_PROVIDER_ORDER`: default `linkedin_li_at,static_seed`
 
-- Data is stored in local SQLite by default.
-- Draft context guardrails block unsafe instructions.
-- Raw emails, phones, and LinkedIn URLs in context are sanitized and surfaced as warnings.
+### Scout weight overrides
 
-## License
+- `SCOUT_V2_WEIGHT_COMPANY_ALIGNMENT`
+- `SCOUT_V2_WEIGHT_ROLE_ALIGNMENT`
+- `SCOUT_V2_WEIGHT_RELATIONSHIP`
+- `SCOUT_V2_WEIGHT_CONNECTOR_INFLUENCE`
+- `SCOUT_V2_WEIGHT_TARGET_CONFIDENCE`
+- `SCOUT_V2_WEIGHT_ASK_FIT`
+- `SCOUT_V2_WEIGHT_SAFETY`
 
-MIT
+</details>

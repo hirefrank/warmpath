@@ -5,6 +5,8 @@ dist/
 .env.*
 *.sqlite
 *.db
+*.db-shm
+*.db-wal
 coverage/
 .idea/
 .vscode/
