@@ -99,9 +99,81 @@ describe("/api/warm-path/scout routes", () => {
 
     const detailPayload = (await detailResponse.json()) as {
       run: { id: string; status: string };
+      diagnostics?: {
+        source: string;
+        adapter_attempts: Array<{ adapter: string; status: string; result_count: number }>;
+      };
     };
     expect(detailPayload.run.id).toBe(runPayload.run.id);
     expect(detailPayload.run.status).toBe("completed");
+    expect(detailPayload.diagnostics?.source).toBe("seed_targets");
+    expect(detailPayload.diagnostics?.adapter_attempts[0]?.adapter).toBe("seed_targets");
+  });
+
+  test("prioritizes strongest mutual connector paths", async () => {
+    const importResponse = await app.request("/api/warm-path/contacts/import", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        contacts: [
+          {
+            name: "Casey Recruiter",
+            current_title: "Senior Recruiter",
+            current_company: "Acme",
+            connected_on: "2025-01-10",
+          },
+          {
+            name: "Robin Engineer",
+            current_title: "Software Engineer",
+            current_company: "Acme",
+            connected_on: "2026-01-10",
+          },
+        ],
+      }),
+    });
+
+    expect(importResponse.status).toBe(200);
+
+    const runResponse = await app.request("/api/warm-path/scout/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        target_company: "Acme",
+        target_function: "product",
+        seed_targets: [
+          {
+            full_name: "Taylor Candidate",
+            current_title: "Senior Product Manager",
+            current_company: "Acme",
+            confidence: 0.82,
+          },
+        ],
+      }),
+    });
+
+    expect(runResponse.status).toBe(200);
+    const payload = (await runResponse.json()) as {
+      run: {
+        connector_paths: Array<{
+          connector_name: string;
+          recommended_ask?: string;
+          path_score: number;
+          score_breakdown?: {
+            scoring_version: string;
+            quality_tier: string;
+          };
+        }>;
+      };
+    };
+
+    expect(payload.run.connector_paths).toHaveLength(2);
+    expect(payload.run.connector_paths[0]?.connector_name).toBe("Casey Recruiter");
+    expect(payload.run.connector_paths[0]?.recommended_ask).toBe("referral");
+    expect(payload.run.connector_paths[0]?.score_breakdown?.scoring_version).toBe("v2");
+    expect(payload.run.connector_paths[0]?.score_breakdown?.quality_tier).toBe("medium");
+    expect((payload.run.connector_paths[0]?.path_score ?? 0)).toBeGreaterThan(
+      payload.run.connector_paths[1]?.path_score ?? 0
+    );
   });
 
   test("returns needs_adapter when no cookie and no seeds", async () => {
@@ -113,7 +185,7 @@ describe("/api/warm-path/scout routes", () => {
 
     expect(response.status).toBe(200);
     const payload = (await response.json()) as {
-      run: { status: string };
+      run: { id: string; status: string };
       notes?: string;
       diagnostics: {
         source: string;
@@ -126,6 +198,17 @@ describe("/api/warm-path/scout routes", () => {
     expect(payload.diagnostics.source).toBe("linkedin_li_at");
     expect(payload.diagnostics.adapter_attempts[0]?.adapter).toBe("linkedin_li_at");
     expect(payload.diagnostics.adapter_attempts[0]?.status).toBe("not_configured");
+
+    const detailResponse = await app.request(`/api/warm-path/scout/runs/${payload.run.id}`);
+    expect(detailResponse.status).toBe(200);
+    const detailPayload = (await detailResponse.json()) as {
+      diagnostics?: {
+        source: string;
+        adapter_attempts: Array<{ adapter: string; status: string }>;
+      };
+    };
+    expect(detailPayload.diagnostics?.source).toBe("linkedin_li_at");
+    expect(detailPayload.diagnostics?.adapter_attempts[0]?.status).toBe("not_configured");
   });
 
   test("uses static fallback provider when configured", async () => {
@@ -224,5 +307,31 @@ describe("/api/warm-path/scout routes", () => {
     expect(payload.stats.by_status.needs_adapter).toBe(1);
     expect(payload.stats.by_source.seed_targets).toBe(1);
     expect(payload.stats.by_source.linkedin_li_at).toBe(1);
+
+    const runsResponse = await app.request("/api/warm-path/scout/runs?limit=5");
+    expect(runsResponse.status).toBe(200);
+    const runsPayload = (await runsResponse.json()) as {
+      runs: Array<{
+        id: string;
+        diagnostics_summary?: {
+          source: string;
+          adapter_count: number;
+          success_count: number;
+          error_count: number;
+          not_configured_count: number;
+        };
+      }>;
+    };
+
+    expect(runsPayload.runs).toHaveLength(2);
+    const withSeedTargets = runsPayload.runs.find(
+      (run) => run.diagnostics_summary?.source === "seed_targets"
+    );
+    expect(withSeedTargets?.diagnostics_summary?.success_count).toBe(1);
+
+    const withMissingAdapters = runsPayload.runs.find(
+      (run) => run.diagnostics_summary?.source === "linkedin_li_at"
+    );
+    expect(withMissingAdapters?.diagnostics_summary?.not_configured_count).toBeGreaterThan(0);
   });
 });

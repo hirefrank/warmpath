@@ -1,13 +1,54 @@
 import type { NormalizedJob } from "@warmpath/shared/contracts/job";
 import type {
+  GetScoutRunResponse,
   RunSecondDegreeScoutResponse,
   ScoutRunStats,
   SecondDegreeScoutRequest,
   SecondDegreeScoutRun,
 } from "@warmpath/shared/contracts/scout";
-import type { IntroDraftResponse, RankedPath } from "@warmpath/shared/contracts/warm-path";
+import type {
+  AutoTuneResponse,
+  DistributionPackResponse,
+  IntroDraftResponse,
+  LearningOutcome,
+  LearningSummaryResponse,
+  LearningWeightProfile,
+  MessageChannel,
+  MessagePackResponse,
+  OutreachWorkflowStatus,
+  OutreachBriefResponse,
+  RankedPath,
+  Reminder,
+  WorkflowSnapshotResponse,
+} from "@warmpath/shared/contracts/warm-path";
 
 const API_BASE = "";
+
+interface ApiErrorShape {
+  error?: string;
+  details?: string;
+}
+
+async function assertOk(response: Response, fallbackMessage: string): Promise<void> {
+  if (response.ok) {
+    return;
+  }
+
+  let message = `${fallbackMessage} (${response.status})`;
+
+  try {
+    const payload = (await response.json()) as ApiErrorShape;
+    if (payload.error && payload.details) {
+      message = `${payload.error}: ${payload.details}`;
+    } else if (payload.error) {
+      message = payload.error;
+    }
+  } catch {
+    // Response body may be empty/non-JSON.
+  }
+
+  throw new Error(message);
+}
 
 export async function syncJobs(input: {
   advisor_slug: string;
@@ -22,9 +63,7 @@ export async function syncJobs(input: {
     body: JSON.stringify(input),
   });
 
-  if (!response.ok) {
-    throw new Error(`Failed to sync jobs (${response.status})`);
-  }
+  await assertOk(response, "Failed to sync jobs");
 
   return response.json();
 }
@@ -45,9 +84,7 @@ export async function listJobs(filters: {
   }
 
   const response = await fetch(`${API_BASE}/api/warm-path/jobs?${search.toString()}`);
-  if (!response.ok) {
-    throw new Error(`Failed to list jobs (${response.status})`);
-  }
+  await assertOk(response, "Failed to list jobs");
 
   const payload = (await response.json()) as { jobs: NormalizedJob[] };
   return payload.jobs;
@@ -56,16 +93,14 @@ export async function listJobs(filters: {
 export async function rankWarmPaths(input: {
   advisor_slug: string;
   job_cache_id: string;
-}): Promise<{ run_id: string; top_paths: RankedPath[] }> {
+}): Promise<{ run_id: string; top_paths: RankedPath[]; weight_profile?: LearningWeightProfile }> {
   const response = await fetch(`${API_BASE}/api/warm-path/rank`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
   });
 
-  if (!response.ok) {
-    throw new Error(`Failed to rank warm paths (${response.status})`);
-  }
+  await assertOk(response, "Failed to rank warm paths");
 
   return response.json();
 }
@@ -74,6 +109,7 @@ export async function draftIntro(input: {
   run_id: string;
   colleague_id: string;
   extra_context?: string;
+  tone?: "warm" | "concise" | "direct";
 }): Promise<IntroDraftResponse> {
   const response = await fetch(`${API_BASE}/api/warm-path/runs/${input.run_id}/intro-draft`, {
     method: "POST",
@@ -81,12 +117,186 @@ export async function draftIntro(input: {
     body: JSON.stringify({
       colleague_id: input.colleague_id,
       extra_context: input.extra_context,
+      tone: input.tone,
     }),
   });
 
-  if (!response.ok) {
-    throw new Error(`Failed to generate draft (${response.status})`);
-  }
+  await assertOk(response, "Failed to generate draft");
+
+  return response.json();
+}
+
+export async function generateOutreachBrief(input: {
+  run_id: string;
+  colleague_id: string;
+  extra_context?: string;
+  tone?: "warm" | "concise" | "direct";
+}): Promise<OutreachBriefResponse> {
+  const response = await fetch(`${API_BASE}/api/warm-path/runs/${input.run_id}/outreach-brief`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      colleague_id: input.colleague_id,
+      extra_context: input.extra_context,
+      tone: input.tone,
+    }),
+  });
+
+  await assertOk(response, "Failed to generate outreach brief");
+
+  return response.json();
+}
+
+export async function generateMessagePack(input: {
+  run_id: string;
+  colleague_id: string;
+  extra_context?: string;
+  tone?: "warm" | "concise" | "direct";
+}): Promise<MessagePackResponse> {
+  const response = await fetch(`${API_BASE}/api/warm-path/runs/${input.run_id}/message-pack`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      colleague_id: input.colleague_id,
+      extra_context: input.extra_context,
+      tone: input.tone,
+    }),
+  });
+
+  await assertOk(response, "Failed to generate message pack");
+
+  return response.json();
+}
+
+export async function getWorkflowSnapshot(input: {
+  run_id: string;
+  colleague_id: string;
+}): Promise<WorkflowSnapshotResponse> {
+  const search = new URLSearchParams({ colleague_id: input.colleague_id });
+  const response = await fetch(`${API_BASE}/api/warm-path/runs/${input.run_id}/workflow?${search.toString()}`);
+
+  await assertOk(response, "Failed to load workflow snapshot");
+
+  return response.json();
+}
+
+export async function trackWorkflowStatus(input: {
+  run_id: string;
+  colleague_id: string;
+  status: OutreachWorkflowStatus;
+  channel?: MessageChannel;
+  note?: string;
+}): Promise<{ snapshot: WorkflowSnapshotResponse }> {
+  const response = await fetch(`${API_BASE}/api/warm-path/runs/${input.run_id}/workflow/track`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      colleague_id: input.colleague_id,
+      status: input.status,
+      channel: input.channel,
+      note: input.note,
+    }),
+  });
+
+  await assertOk(response, "Failed to track workflow status");
+
+  return response.json();
+}
+
+export async function scheduleReminder(input: {
+  run_id: string;
+  colleague_id: string;
+  message: string;
+  channel?: MessageChannel;
+  due_at?: string;
+  offset_days?: number;
+}): Promise<{ reminder: Reminder; snapshot: WorkflowSnapshotResponse }> {
+  const response = await fetch(`${API_BASE}/api/warm-path/runs/${input.run_id}/reminders`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      colleague_id: input.colleague_id,
+      message: input.message,
+      channel: input.channel,
+      due_at: input.due_at,
+      offset_days: input.offset_days,
+    }),
+  });
+
+  await assertOk(response, "Failed to schedule reminder");
+
+  return response.json();
+}
+
+export async function updateReminder(input: {
+  run_id: string;
+  reminder_id: string;
+  status: "pending" | "completed" | "cancelled";
+}): Promise<{ reminder: Reminder; snapshot: WorkflowSnapshotResponse }> {
+  const response = await fetch(`${API_BASE}/api/warm-path/runs/${input.run_id}/reminders/${input.reminder_id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ status: input.status }),
+  });
+
+  await assertOk(response, "Failed to update reminder");
+
+  return response.json();
+}
+
+export async function getLearningSummary(): Promise<LearningSummaryResponse> {
+  const response = await fetch(`${API_BASE}/api/warm-path/learning/summary`);
+  await assertOk(response, "Failed to load learning summary");
+
+  return response.json();
+}
+
+export async function recordLearningFeedback(input: {
+  run_id: string;
+  colleague_id: string;
+  outcome: LearningOutcome;
+  note?: string;
+}): Promise<{ summary: LearningSummaryResponse }> {
+  const response = await fetch(`${API_BASE}/api/warm-path/learning/feedback`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  await assertOk(response, "Failed to record learning feedback");
+
+  return response.json();
+}
+
+export async function autoTuneLearning(minSamples: number = 5): Promise<AutoTuneResponse> {
+  const response = await fetch(`${API_BASE}/api/warm-path/learning/auto-tune`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ min_samples: minSamples }),
+  });
+
+  await assertOk(response, "Failed to auto-tune learning profile");
+
+  return response.json();
+}
+
+export async function generateDistributionPack(input: {
+  run_id: string;
+  colleague_id: string;
+  extra_context?: string;
+  tone?: "warm" | "concise" | "direct";
+}): Promise<DistributionPackResponse> {
+  const response = await fetch(`${API_BASE}/api/warm-path/runs/${input.run_id}/distribution-pack`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      colleague_id: input.colleague_id,
+      extra_context: input.extra_context,
+      tone: input.tone,
+    }),
+  });
+
+  await assertOk(response, "Failed to generate distribution pack");
 
   return response.json();
 }
@@ -108,9 +318,7 @@ export async function importContactsFromCsv(csv: string): Promise<{ imported: nu
     body: JSON.stringify({ csv }),
   });
 
-  if (!response.ok) {
-    throw new Error(`Failed to import contacts (${response.status})`);
-  }
+  await assertOk(response, "Failed to import contacts");
 
   return response.json();
 }
@@ -122,9 +330,7 @@ export async function listContacts(company?: string): Promise<ContactRecord[]> {
   }
 
   const response = await fetch(`${API_BASE}/api/warm-path/contacts?${search.toString()}`);
-  if (!response.ok) {
-    throw new Error(`Failed to list contacts (${response.status})`);
-  }
+  await assertOk(response, "Failed to list contacts");
 
   const payload = (await response.json()) as { contacts: ContactRecord[] };
   return payload.contacts;
@@ -139,18 +345,14 @@ export async function runSecondDegreeScout(
     body: JSON.stringify(input),
   });
 
-  if (!response.ok) {
-    throw new Error(`Failed to run scout (${response.status})`);
-  }
+  await assertOk(response, "Failed to run scout");
 
   return response.json();
 }
 
 export async function listScoutRuns(limit: number = 20): Promise<SecondDegreeScoutRun[]> {
   const response = await fetch(`${API_BASE}/api/warm-path/scout/runs?limit=${limit}`);
-  if (!response.ok) {
-    throw new Error(`Failed to list scout runs (${response.status})`);
-  }
+  await assertOk(response, "Failed to list scout runs");
 
   const payload = (await response.json()) as {
     runs: Array<{
@@ -163,6 +365,7 @@ export async function listScoutRuns(limit: number = 20): Promise<SecondDegreeSco
       notes?: string;
       created_at: string;
       updated_at: string;
+      diagnostics_summary?: SecondDegreeScoutRun["diagnostics_summary"];
     }>;
   };
 
@@ -173,21 +376,16 @@ export async function listScoutRuns(limit: number = 20): Promise<SecondDegreeSco
   }));
 }
 
-export async function getScoutRun(runId: string): Promise<SecondDegreeScoutRun> {
+export async function getScoutRun(runId: string): Promise<GetScoutRunResponse> {
   const response = await fetch(`${API_BASE}/api/warm-path/scout/runs/${runId}`);
-  if (!response.ok) {
-    throw new Error(`Failed to get scout run (${response.status})`);
-  }
+  await assertOk(response, "Failed to get scout run");
 
-  const payload = (await response.json()) as { run: SecondDegreeScoutRun };
-  return payload.run;
+  return response.json();
 }
 
 export async function getScoutStats(): Promise<ScoutRunStats> {
   const response = await fetch(`${API_BASE}/api/warm-path/scout/stats`);
-  if (!response.ok) {
-    throw new Error(`Failed to get scout stats (${response.status})`);
-  }
+  await assertOk(response, "Failed to get scout stats");
 
   const payload = (await response.json()) as { stats: ScoutRunStats };
   return payload.stats;

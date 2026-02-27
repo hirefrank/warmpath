@@ -1,5 +1,5 @@
 import { classifyAskType } from "./ask-type";
-import { defaultWeights } from "./weights";
+import { defaultWeights, scoringDimensionMax, type ScoringWeights } from "./weights";
 
 export interface ContactSignals {
   colleagueId: string;
@@ -25,21 +25,21 @@ export interface RankedContact {
   rationale: string;
 }
 
-export function rankContacts(signals: ContactSignals[]): RankedContact[] {
+export function rankContacts(signals: ContactSignals[], weights: ScoringWeights = defaultWeights): RankedContact[] {
   return signals
     .map((signal) => {
-      const companyAffinity = clamp(signal.companyAffinity, 0, 35);
-      const roleRelevance = clamp(signal.roleRelevance, 0, 25);
-      const relationshipStrength = clamp(signal.relationshipStrength, 0, 20);
-      const sharedContext = clamp(signal.sharedContext, 0, 15);
-      const confidence = clamp(signal.confidence, 0, 5);
+      const companyAffinity = clamp(signal.companyAffinity, 0, scoringDimensionMax.companyAffinity);
+      const roleRelevance = clamp(signal.roleRelevance, 0, scoringDimensionMax.roleRelevance);
+      const relationshipStrength = clamp(signal.relationshipStrength, 0, scoringDimensionMax.relationshipStrength);
+      const sharedContext = clamp(signal.sharedContext, 0, scoringDimensionMax.sharedContext);
+      const confidence = clamp(signal.confidence, 0, scoringDimensionMax.confidence);
 
       const total =
-        companyAffinity * (defaultWeights.companyAffinity / 35) +
-        roleRelevance * (defaultWeights.roleRelevance / 25) +
-        relationshipStrength * (defaultWeights.relationshipStrength / 20) +
-        sharedContext * (defaultWeights.sharedContext / 15) +
-        confidence * (defaultWeights.confidence / 5);
+        companyAffinity * (weights.companyAffinity / scoringDimensionMax.companyAffinity) +
+        roleRelevance * (weights.roleRelevance / scoringDimensionMax.roleRelevance) +
+        relationshipStrength * (weights.relationshipStrength / scoringDimensionMax.relationshipStrength) +
+        sharedContext * (weights.sharedContext / scoringDimensionMax.sharedContext) +
+        confidence * (weights.confidence / scoringDimensionMax.confidence);
 
       return {
         colleague_id: signal.colleagueId,

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { getDatabase, resetDatabaseForTests } from "../../db";
+import { upsertContacts } from "../../db/repositories/contacts";
+import { getScoutDiagnosticsByRunId } from "../../db/repositories/second-degree-scout";
 import {
   runSecondDegreeScout,
   type ScoutProvider,
@@ -88,6 +90,11 @@ describe("runSecondDegreeScout provider chain", () => {
     expect(result.diagnostics.adapter_attempts).toHaveLength(2);
     expect(result.diagnostics.adapter_attempts[0]?.status).toBe("no_results");
     expect(result.diagnostics.adapter_attempts[1]?.status).toBe("success");
+
+    const persistedDiagnostics = getScoutDiagnosticsByRunId(db, result.run.id);
+    expect(persistedDiagnostics?.source).toBe("secondary");
+    expect(persistedDiagnostics?.adapter_attempts).toHaveLength(2);
+    expect(persistedDiagnostics?.adapter_attempts[1]?.status).toBe("success");
   });
 
   test("returns needs_adapter when all adapters are not configured", async () => {
@@ -140,5 +147,46 @@ describe("runSecondDegreeScout provider chain", () => {
     expect(result.diagnostics.adapter_attempts[0]?.status).toBe("error");
     expect(result.diagnostics.adapter_attempts[0]?.error).toContain("unavailable");
     expect(result.diagnostics.adapter_attempts[1]?.status).toBe("success");
+  });
+
+  test("applies ask guardrails and stores score breakdown", async () => {
+    const db = getDatabase();
+
+    upsertContacts(db, [
+      {
+        name: "Pat Recruiter",
+        current_title: "Recruiter",
+        current_company: "Acme",
+        connected_on: "2015-01-01",
+      },
+    ]);
+
+    const result = await runSecondDegreeScout(
+      db,
+      {
+        target_company: "Acme",
+      },
+      [
+        new MockScoutProvider({
+          name: "seeded",
+          targets: [
+            {
+              full_name: "Riley Candidate",
+              current_company: "Acme",
+              current_title: "Product Manager",
+              confidence: 0.5,
+            },
+          ],
+        }),
+      ]
+    );
+
+    expect(result.run.status).toBe("completed");
+    expect(result.run.connector_paths).toHaveLength(1);
+    const path = result.run.connector_paths[0]!;
+    expect(path.recommended_ask).toBe("intro");
+    expect(path.score_breakdown?.scoring_version).toBe("v2");
+    expect(path.score_breakdown?.guardrail_adjustments.length).toBeGreaterThan(0);
+    expect(path.score_breakdown?.guardrail_penalty).toBeGreaterThan(0);
   });
 });

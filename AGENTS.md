@@ -1,121 +1,162 @@
-# CLAUDE.md
+# AGENTS.md
+Guide for coding agents working in `warmpath`.
 
-Guidelines for coding agents working in WarmPath.
+## Project Summary
+WarmPath is a local-first job seeker copilot that helps users:
+- discover jobs,
+- rank warm connectors,
+- generate outreach materials,
+- track outreach workflow,
+- learn from outcomes and tune ranking.
 
-## Project Overview
+Monorepo stack:
+- `apps/server`: Bun + Hono + SQLite API
+- `apps/client`: React 19 + Vite + Tailwind v4 + shadcn/ui
+- `packages/shared`: shared TypeScript contracts
+- `docs`: roadmap, API references, release notes
 
-WarmPath is a local-first job seeker copilot for finding warm outreach paths. Monorepo with Bun workspaces.
-
-## Repository Structure
-
+## Repository Layout
+```text
+apps/server                  routes, DB repos, scoring, tests
+apps/client                  UI pages/components and client API wrappers
+packages/shared              request/response/event contracts
+docs/                        plans and release/API docs
 ```
-apps/server      — Bun + Hono + SQLite API (port 3001)
-apps/client      — React 19 + Vite + Tailwind v4 + shadcn/ui (port 5173)
-packages/shared  — Shared TypeScript contracts
-docs/            — Roadmap, ticket map, architecture notes
-```
+
+## Environment
+- Runtime/package manager: Bun
+- Server: `http://localhost:3001`
+- Client: `http://localhost:5173`
+- Default DB: `warmpath.db` (repo root)
+- Override DB path with `WARMPATH_DB_PATH`
 
 ## Build / Dev / Test Commands
+Run from repo root unless noted.
 
+### Install deps
 ```bash
-bun install                          # install all workspace deps
-bun run dev:server                   # Hono API on :3001
-bun run dev:client                   # Vite dev server on :5173
-bun run typecheck:client             # client type check
-bun run typecheck:server             # server type check
-bun run test:server                  # server tests
-bun run --cwd apps/client build      # production build
-bun run demo                         # full demo flow
+bun install
 ```
 
-## Code Style
-
-- ESM throughout, `"type": "module"` in all package.json files
-- Import order: external → internal → type imports
-- Use `import type` for type-only imports
-- 2-space indentation, double quotes, semicolons
-- `PascalCase` for types/interfaces/components, `camelCase` for functions/variables
-- Avoid `any`; use `unknown` + narrowing
-- Validate external inputs at API boundaries
-
-## Path Aliases (Client)
-
-- `@/*` → `apps/client/src/*`
-- `@warmpath/shared/*` → `packages/shared/src/*`
-
-Configured in both `apps/client/tsconfig.json` and `apps/client/vite.config.ts`.
-
-## Client Design System
-
-### Stack
-
-- **Bundler:** Vite 6 with `@vitejs/plugin-react`
-- **CSS:** Tailwind CSS v4 (CSS-first — no `tailwind.config.js`, config lives in `src/index.css` `@theme` block)
-- **Components:** shadcn/ui (new-york style, no RSC)
-- **Icons:** lucide-react
-- **Utilities:** `class-variance-authority`, `clsx`, `tailwind-merge`
-
-### Theme Tokens
-
-Defined in `apps/client/src/index.css` via oklch CSS variables:
-
-- `--color-primary` / `--color-primary-foreground` — buttons, active states
-- `--color-muted` / `--color-muted-foreground` — secondary text, subtle backgrounds
-- `--color-card` / `--color-card-foreground` — card surfaces
-- `--color-sidebar-*` — sidebar-specific palette (background, foreground, accent, border)
-- `--color-border`, `--color-input`, `--color-ring` — form element chrome
-- `--color-destructive` — error states and alerts
-- `--radius` — global border radius (`0.625rem`)
-
-Neutral base color. No dark mode yet.
-
-### UI Components (`src/components/ui/`)
-
-Lightweight shadcn/ui ports. Only external Radix dependency is `@radix-ui/react-slot` (Button `asChild`):
-
-| Component | Notes |
-|---|---|
-| `button` | CVA variants: default, destructive, outline, secondary, ghost, link. Sizes: default, sm, lg, icon |
-| `card` | Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter |
-| `input` | Styled native `<input>` |
-| `textarea` | Styled native `<textarea>` |
-| `select` | Native `<select>` with lucide ChevronDown overlay |
-| `badge` | CVA variants: default, secondary, destructive, outline |
-| `label` | Styled native `<label>` |
-| `separator` | Horizontal/vertical divider |
-| `scroll-area` | Simple overflow container (no Radix ScrollArea) |
-
-### Layout Architecture
-
-```
-AppLayout (flex h-screen)
-├── AppSidebar (w-60, fixed left, 5 workflow steps)
-│   └── Scout → Contacts → Jobs → Rank → Draft
-└── ScrollArea (flex-1, scrollable)
-    └── main (max-w-3xl, centered)
-        └── active step panel
+### Start dev servers
+```bash
+bun run dev:server
+bun run dev:client
 ```
 
-- `OutreachPage` owns all state and passes handlers as props
-- `activeStep` state controls which panel renders
-- Sidebar badges show live counts (contacts, jobs, paths, draft status)
+### Start single-origin mode (UI + API on one origin)
+```bash
+bun run dev:single-origin
+```
 
-### Component Conventions
+### Typecheck
+```bash
+bun run typecheck:server
+bun run typecheck:client
+```
 
-- All outreach components receive props only — no internal data fetching
-- Use `cn()` from `@/lib/utils` for conditional class merging
-- Wrap panel sections in `Card` components
-- Form fields: `Label` + `Input`/`Textarea`/`Select`
-- Actions: shadcn `Button` with appropriate variant
-- Counts and statuses: `Badge` components
-- Progress bars: colored `div` inside `bg-muted` track with percentage width
+### Test (server)
+```bash
+bun run test:server
+```
 
-### API Proxy
+### Run a single test file
+```bash
+bun run --cwd apps/server test src/routes/warm-path-runs.route.test.ts
+```
 
-Vite dev server proxies `/api` → `http://localhost:3001`. Client uses relative URLs (`API_BASE = ""`). No CORS needed in dev.
+### Run a single test by name
+```bash
+bun run --cwd apps/server test src/routes/warm-path-runs.route.test.ts -t "generates distribution pack artifacts"
+```
 
-## Server Notes
+### Build client
+```bash
+bun run --cwd apps/client build
+```
 
-- Database file defaults to `warmpath.db` in project root
-- Override with `WARMPATH_DB_PATH` env var
-- `LINKEDIN_LI_AT` env var for 2nd-degree scout LinkedIn integration
+### Run demo flow
+```bash
+bun run demo
+```
+
+## Linting
+- No dedicated lint script exists in root/workspace `package.json` files.
+- Current quality gates: TypeScript checks + server tests + client build.
+
+## Code Style and Conventions
+
+### Language and module system
+- TypeScript + ESM only.
+- Prefer named exports for utilities when practical (follow local file patterns).
+
+### Imports
+- Use `import type` for type-only imports.
+- Keep import order:
+  1) external packages,
+  2) internal modules,
+  3) type imports (if separated).
+
+### Formatting
+- 2-space indentation
+- double quotes
+- semicolons
+- trailing commas where formatter emits them
+
+### Types and validation
+- Avoid `any`; prefer `unknown` + narrowing.
+- Validate untrusted input at route boundaries.
+- Keep wire contracts in `packages/shared/src/contracts/*`.
+- Update server and client together when contract shapes change.
+
+### Naming
+- `PascalCase`: components, interfaces, type aliases
+- `camelCase`: functions, variables, params
+- Keep file naming pattern consistent with neighboring files.
+
+## Error Handling Patterns
+
+### Server (Hono)
+- Parse request JSON defensively: `await c.req.json().catch(() => ({}))`.
+- Return `400` for invalid inputs with `{ error: string }`.
+- Return `404` for missing resources.
+- Wrap route logic in `try/catch` and return `{ error, details }` with `500` on unexpected failures.
+
+### Client API wrappers
+- Use shared response guard logic (`assertOk`) in `apps/client/src/lib/api.ts`.
+- Surface server error payloads (`error`, `details`) in thrown errors.
+
+## Data Layer Conventions
+- Add schema changes in `apps/server/src/db/migrate.ts`.
+- Put SQL access in `apps/server/src/db/repositories/*`.
+- Keep route handlers thin; call repository helpers.
+- For persistent features, include migration + repository + route + tests.
+
+## Client Conventions
+- `OutreachPage` owns orchestration state and step transitions.
+- Prefer props-driven presentational components in `components/outreach/*`.
+- Use shared UI primitives in `components/ui/*`.
+- Use `cn()` from `@/lib/utils` for class composition.
+- Keep UI consistent with existing Tailwind/shadcn patterns.
+
+## Testing Conventions
+- Test framework: `bun:test`.
+- Route tests isolate DB using temp `WARMPATH_DB_PATH`.
+- Use `resetDatabaseForTests()` in setup/teardown when touching DB.
+- Cover success paths, validation failures, and guardrail edge cases.
+
+## Agent Completion Checklist
+Before handing off substantial changes:
+1. `bun run typecheck:server`
+2. `bun run typecheck:client`
+3. `bun run test:server`
+4. `bun run --cwd apps/client build`
+5. Update docs when APIs/contracts/workflows change.
+
+## Cursor / Copilot Rules
+Checked for additional repo instructions in:
+- `.cursor/rules/`
+- `.cursorrules`
+- `.github/copilot-instructions.md`
+
+Current status: none of these files/directories exist in this repository.

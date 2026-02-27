@@ -125,4 +125,116 @@ export const migrations: string[] = [
   )
   `,
   `CREATE INDEX IF NOT EXISTS idx_connector_paths_run_id ON connector_paths(run_id)`,
+  `
+  CREATE TABLE IF NOT EXISTS connector_path_scores (
+    path_id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    scoring_version TEXT NOT NULL,
+    company_alignment REAL NOT NULL DEFAULT 0,
+    role_alignment REAL NOT NULL DEFAULT 0,
+    relationship REAL NOT NULL DEFAULT 0,
+    connector_influence REAL NOT NULL DEFAULT 0,
+    target_confidence REAL NOT NULL DEFAULT 0,
+    ask_fit REAL NOT NULL DEFAULT 0,
+    safety REAL NOT NULL DEFAULT 0,
+    total_before_guardrails REAL NOT NULL DEFAULT 0,
+    guardrail_penalty REAL NOT NULL DEFAULT 0,
+    quality_tier TEXT NOT NULL DEFAULT 'low',
+    guardrail_adjustments TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(path_id) REFERENCES connector_paths(id) ON DELETE CASCADE,
+    FOREIGN KEY(run_id) REFERENCES second_degree_scout_runs(id) ON DELETE CASCADE
+  )
+  `,
+  `CREATE INDEX IF NOT EXISTS idx_connector_path_scores_run_id ON connector_path_scores(run_id)`,
+  `
+  CREATE TABLE IF NOT EXISTS scout_run_diagnostics (
+    run_id TEXT PRIMARY KEY,
+    source TEXT NOT NULL,
+    used_seed_targets INTEGER NOT NULL DEFAULT 0,
+    requested_limit INTEGER NOT NULL,
+    effective_limit INTEGER NOT NULL,
+    min_confidence REAL NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(run_id) REFERENCES second_degree_scout_runs(id) ON DELETE CASCADE
+  )
+  `,
+  `
+  CREATE TABLE IF NOT EXISTS scout_adapter_attempts (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    adapter TEXT NOT NULL,
+    status TEXT NOT NULL,
+    result_count INTEGER NOT NULL DEFAULT 0,
+    error TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(run_id) REFERENCES second_degree_scout_runs(id) ON DELETE CASCADE
+  )
+  `,
+  `CREATE INDEX IF NOT EXISTS idx_scout_adapter_attempts_run_id ON scout_adapter_attempts(run_id)`,
+  `
+  CREATE TABLE IF NOT EXISTS outreach_workflow_entries (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    colleague_id TEXT NOT NULL,
+    status TEXT NOT NULL,
+    channel TEXT,
+    note TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(run_id) REFERENCES warm_path_runs(id) ON DELETE CASCADE
+  )
+  `,
+  `CREATE INDEX IF NOT EXISTS idx_outreach_workflow_run_id ON outreach_workflow_entries(run_id)`,
+  `
+  CREATE TABLE IF NOT EXISTS outreach_reminders (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    colleague_id TEXT NOT NULL,
+    due_at TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    message TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(run_id) REFERENCES warm_path_runs(id) ON DELETE CASCADE
+  )
+  `,
+  `CREATE INDEX IF NOT EXISTS idx_outreach_reminders_run_id ON outreach_reminders(run_id)`,
+  `
+  CREATE TABLE IF NOT EXISTS learning_feedback (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    colleague_id TEXT NOT NULL,
+    outcome TEXT NOT NULL,
+    note TEXT,
+    source TEXT NOT NULL DEFAULT 'manual',
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(run_id) REFERENCES warm_path_runs(id) ON DELETE CASCADE
+  )
+  `,
+  `CREATE INDEX IF NOT EXISTS idx_learning_feedback_run_id ON learning_feedback(run_id)`,
+  `
+  CREATE TABLE IF NOT EXISTS learning_weight_profiles (
+    id TEXT PRIMARY KEY,
+    label TEXT NOT NULL,
+    source TEXT NOT NULL,
+    company_affinity REAL NOT NULL,
+    role_relevance REAL NOT NULL,
+    relationship_strength REAL NOT NULL,
+    shared_context REAL NOT NULL,
+    confidence REAL NOT NULL,
+    sample_size INTEGER NOT NULL DEFAULT 0,
+    is_active INTEGER NOT NULL DEFAULT 0,
+    activated_at TEXT DEFAULT (datetime('now')),
+    created_at TEXT DEFAULT (datetime('now'))
+  )
+  `,
+  `CREATE INDEX IF NOT EXISTS idx_learning_weight_profiles_active ON learning_weight_profiles(is_active)`,
+  `
+  CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT DEFAULT (datetime('now'))
+  )
+  `,
 ];

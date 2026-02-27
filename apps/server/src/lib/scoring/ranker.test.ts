@@ -51,4 +51,40 @@ describe("rankContacts", () => {
     expect(ranked[0]?.confidence).toBe(5);
     expect(ranked[0]?.total_score).toBeLessThanOrEqual(100);
   });
+
+  test("supports custom weight profiles", () => {
+    const ranked = rankContacts(
+      [
+        {
+          colleagueId: "relationship-heavy",
+          name: "Relationship Heavy",
+          title: "Engineer",
+          companyAffinity: 10,
+          roleRelevance: 10,
+          relationshipStrength: 20,
+          sharedContext: 10,
+          confidence: 3,
+        },
+        {
+          colleagueId: "company-heavy",
+          name: "Company Heavy",
+          title: "Engineer",
+          companyAffinity: 35,
+          roleRelevance: 18,
+          relationshipStrength: 6,
+          sharedContext: 5,
+          confidence: 2,
+        },
+      ],
+      {
+        companyAffinity: 15,
+        roleRelevance: 10,
+        relationshipStrength: 50,
+        sharedContext: 20,
+        confidence: 5,
+      }
+    );
+
+    expect(ranked[0]?.colleague_id).toBe("relationship-heavy");
+  });
 });

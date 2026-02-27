@@ -73,14 +73,22 @@ export class StaticScoutProvider implements ScoutProvider {
 }
 
 export function createStaticScoutProviderFromEnv(): StaticScoutProvider {
-  const targets = parseTargetsFromEnv(process.env.SCOUT_STATIC_TARGETS_JSON);
+  const targets = parseStaticScoutTargets(process.env.SCOUT_STATIC_TARGETS_JSON);
   return new StaticScoutProvider({
     targets,
     name: "static_seed",
   });
 }
 
-function parseTargetsFromEnv(value: string | undefined): ScoutProviderTarget[] {
+export function createStaticScoutProviderFromJson(value: string): StaticScoutProvider {
+  const targets = parseStaticScoutTargets(value);
+  return new StaticScoutProvider({
+    targets,
+    name: "static_seed",
+  });
+}
+
+export function parseStaticScoutTargets(value: string | undefined): ScoutProviderTarget[] {
   if (!value || value.trim().length === 0) {
     return [];
   }
@@ -91,24 +99,35 @@ function parseTargetsFromEnv(value: string | undefined): ScoutProviderTarget[] {
       return [];
     }
 
-    return normalizeTargets(parsed as ScoutProviderTarget[]);
+    return normalizeTargets(parsed);
   } catch {
     return [];
   }
 }
 
-function normalizeTargets(targets: ScoutProviderTarget[]): ScoutProviderTarget[] {
+function normalizeTargets(targets: unknown[]): ScoutProviderTarget[] {
   return targets
-    .map((target) => ({
-      full_name: target.full_name?.trim() ?? "",
-      headline: target.headline?.trim() || undefined,
-      current_company: target.current_company?.trim() || undefined,
-      current_title: target.current_title?.trim() || undefined,
-      linkedin_url: target.linkedin_url?.trim() || undefined,
-      confidence: clampConfidence(target.confidence),
-      match_reason: target.match_reason?.trim() || undefined,
-    }))
+    .map((target) => normalizeTarget(target))
+    .filter((target): target is ScoutProviderTarget => target !== null)
     .filter((target) => target.full_name.length > 1);
+}
+
+function normalizeTarget(target: unknown): ScoutProviderTarget | null {
+  if (!target || typeof target !== "object") {
+    return null;
+  }
+
+  const candidate = target as Partial<ScoutProviderTarget>;
+
+  return {
+    full_name: candidate.full_name?.trim() ?? "",
+    headline: candidate.headline?.trim() || undefined,
+    current_company: candidate.current_company?.trim() || undefined,
+    current_title: candidate.current_title?.trim() || undefined,
+    linkedin_url: candidate.linkedin_url?.trim() || undefined,
+    confidence: clampConfidence(candidate.confidence),
+    match_reason: candidate.match_reason?.trim() || undefined,
+  };
 }
 
 function clampConfidence(value: number | undefined): number {

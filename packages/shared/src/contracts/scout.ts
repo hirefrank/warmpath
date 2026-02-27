@@ -53,6 +53,30 @@ export interface ConnectorPath {
   path_score: number;
   rationale?: string;
   recommended_ask?: "context" | "intro" | "referral";
+  score_breakdown?: ConnectorPathScoreBreakdown;
+}
+
+export interface ConnectorPathScoreBreakdown {
+  scoring_version: string;
+  company_alignment: number;
+  role_alignment: number;
+  relationship: number;
+  connector_influence: number;
+  target_confidence: number;
+  ask_fit: number;
+  safety: number;
+  total_before_guardrails: number;
+  guardrail_penalty: number;
+  quality_tier: "high" | "medium" | "low";
+  guardrail_adjustments: string[];
+}
+
+export interface ScoutDiagnosticsSummary {
+  source: string;
+  adapter_count: number;
+  success_count: number;
+  error_count: number;
+  not_configured_count: number;
 }
 
 export interface SecondDegreeScoutRun {
@@ -65,6 +89,7 @@ export interface SecondDegreeScoutRun {
   notes?: string;
   created_at: string;
   updated_at: string;
+  diagnostics_summary?: ScoutDiagnosticsSummary;
   targets: SecondDegreeTarget[];
   connector_paths: ConnectorPath[];
 }
@@ -80,4 +105,9 @@ export interface RunSecondDegreeScoutResponse {
   run: SecondDegreeScoutRun;
   notes?: string;
   diagnostics: ScoutRunDiagnostics;
+}
+
+export interface GetScoutRunResponse {
+  run: SecondDegreeScoutRun;
+  diagnostics?: ScoutRunDiagnostics;
 }

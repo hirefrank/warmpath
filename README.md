@@ -1,188 +1,214 @@
 # WarmPath
 
-Local-first job seeker copilot for finding the best warm outreach path.
+Find the best warm path into a job, then execute outreach with structure.
 
-## Product Lanes
+## What this is (plain English)
 
-- Reachable Now: jobs where you already have direct network coverage.
-- Build a Path: jobs where a viable connector path can be created.
-- Execute: outreach packs (intro email, DM, follow-up sequence).
+Job hunting is usually noisy:
 
-## Core Flow
+- you find a role,
+- you guess who to contact,
+- you write a message,
+- and you lose track of follow-ups.
 
-1. Discover jobs
-2. Rank warm paths
-3. Generate outreach pack
-4. Track outcomes and improve ranking
+WarmPath helps you do this in a repeatable way.
 
-## Tech Direction
+You import contacts, choose a job, and WarmPath ranks who in your network is the strongest connector. Then it generates outreach materials (brief, email, DM, follow-up plan), tracks what happened, and learns from outcomes.
 
-- App model: local-first desktop/web app on `localhost`
-- Server: Bun + Hono + SQLite (port 3001)
-- Client: React 19 + Vite + Tailwind CSS v4 + shadcn/ui (port 5173)
-- Integrations: LinkedIn session (`li_at`), jobs feed APIs, optional LLM
+Everything runs locally on your machine by default.
 
-## Repository Layout
+## How it works (plain English)
 
-- `apps/server`: API, data pipeline, scoring engine
-- `apps/client`: UI for discovery, ranking, and outreach
-- `packages/shared`: shared contracts and types
-- `docs`: roadmap, ticket map, and architecture notes
+1. **Scout** possible paths to target companies and roles (including second-degree candidates).
+2. **Rank** connectors by weighted signals (company affinity, role relevance, relationship strength, context, confidence).
+3. **Generate** structured outreach assets (briefs, message variants, distribution artifacts).
+4. **Track** workflow status and reminders so outreach does not fall through.
+5. **Learn** from outcomes and auto-tune ranking weights over time.
+
+## Key Features
+
+- Reachable-now lane: rank direct warm connectors for selected jobs
+- Build-a-path lane: scout second-degree targets and connector paths
+- Structured outreach brief generation with trust/safety guardrails
+- Message packs (email + DM + follow-up variants)
+- Workflow tracking + reminder scheduling
+- Learning loop + auto-tuned scoring profile
+- Distribution pack export modes:
+  - machine-readable JSON bundle
+  - markdown playbook
+  - CRM-ready note
 
 ## Quick Start
 
-1. Install dependencies:
+### Prerequisites
+
+- [Bun](https://bun.sh)
+
+### Setup
 
 ```bash
+# 1) install dependencies
 bun install
-```
 
-2. Run server:
-
-```bash
+# 2) start API server (terminal A)
 bun run dev:server
-```
 
-3. Run client:
-
-```bash
+# 3) start client (terminal B)
 bun run dev:client
 ```
 
-4. Open `http://localhost:5173` — sidebar with 5 workflow steps (Scout, Contacts, Jobs, Rank, Draft).
+Open:
 
-5. Check API health:
+- App: [http://localhost:5173](http://localhost:5173)
+- API health: [http://localhost:3001/api/health](http://localhost:3001/api/health)
+
+### Single-origin mode (Backchannel-style)
+
+If you want one origin (same host/port for UI + API), use:
 
 ```bash
-curl -s http://localhost:3001/api/health
+bun run dev:single-origin
 ```
 
-6. Run server tests:
+Then open:
 
-```bash
-bun run --cwd apps/server test
-```
+- App + API: [http://localhost:3001](http://localhost:3001)
 
-7. Run the full demo flow in one command:
+Notes:
+
+- This builds the client and serves static assets from the Hono server.
+- Great for local production-like behavior.
+- For fastest UI iteration/HMR, keep using dual-process dev (`dev:client` + `dev:server`).
+
+### One-command demo
 
 ```bash
 bun run demo
 ```
 
-## Client Design System
+## Setup Details (clear checklist)
 
-The client uses a sidebar-driven workflow layout built with:
+1. Install Bun.
+2. Clone this repo.
+3. Run `bun install` from repo root.
+4. Start server: `bun run dev:server`.
+5. Start client: `bun run dev:client`.
+6. Open `http://localhost:5173`.
+7. (Optional) Import LinkedIn contacts CSV.
+8. Pick a job, rank paths, and generate outreach assets.
 
-- **Vite 6** — dev server with API proxy (`/api` → `:3001`), React plugin, path aliases
-- **Tailwind CSS v4** — CSS-first config via `@theme` block in `src/index.css` (no `tailwind.config.js`)
-- **shadcn/ui** — new-york style components (Button, Card, Input, Textarea, Select, Badge, Label, Separator, ScrollArea)
-- **lucide-react** — icons
+If you only need local/offline behavior, you can run without LinkedIn session config.
 
-### Layout
+## Configuration
 
+### Core
+
+- `WARMPATH_DB_PATH` (optional): override SQLite file path (default `warmpath.db` in repo root).
+
+### LinkedIn + Scout
+
+- `LINKEDIN_LI_AT`: LinkedIn session cookie for live 2nd-degree discovery.
+- `LINKEDIN_RATE_LIMIT_MS` (optional, default `1200`)
+- `LINKEDIN_REQUEST_TIMEOUT_MS` (optional, default `15000`)
+- `SCOUT_MIN_TARGET_CONFIDENCE` (optional, default `0.45`)
+- `SCOUT_STATIC_TARGETS_JSON` (optional): fallback targets for local/non-LinkedIn scouting.
+- `SCOUT_PROVIDER_ORDER` (optional, default `linkedin_li_at,static_seed`)
+
+### Scout v2 score weight overrides (optional)
+
+- `SCOUT_V2_WEIGHT_COMPANY_ALIGNMENT`
+- `SCOUT_V2_WEIGHT_ROLE_ALIGNMENT`
+- `SCOUT_V2_WEIGHT_RELATIONSHIP`
+- `SCOUT_V2_WEIGHT_CONNECTOR_INFLUENCE`
+- `SCOUT_V2_WEIGHT_TARGET_CONFIDENCE`
+- `SCOUT_V2_WEIGHT_ASK_FIT`
+- `SCOUT_V2_WEIGHT_SAFETY`
+
+Without valid `LINKEDIN_LI_AT`, scout runs still work with seed/static targets and may return `needs_adapter` for live discovery.
+
+## Development Commands
+
+```bash
+# single-origin local runtime (build client, serve both from :3001)
+bun run dev:single-origin
+
+# type checks
+bun run typecheck:server
+bun run typecheck:client
+
+# server tests
+bun run test:server
+
+# single test file
+bun run --cwd apps/server test src/routes/warm-path-runs.route.test.ts
+
+# single test by name
+bun run --cwd apps/server test src/routes/warm-path-runs.route.test.ts -t "generates distribution pack artifacts"
+
+# production client build
+bun run --cwd apps/client build
 ```
-AppLayout
-├── AppSidebar (w-60) — Scout → Contacts → Jobs → Rank → Draft
-└── ScrollArea — max-w-3xl centered content area
-```
 
-Each sidebar step renders one panel. `OutreachPage` owns all state and routes between steps via `activeStep`.
+Note: there is currently no dedicated lint script; typecheck + tests + build are the quality gates.
 
-### Theme
+## API Overview (Release 3)
 
-Neutral oklch color tokens defined as CSS variables — `primary`, `muted`, `card`, `sidebar-*`, `border`, `destructive`, `radius`. No dark mode yet.
+Warm-path core:
 
-### Path Aliases
+- `POST /api/warm-path/rank`
+- `GET /api/warm-path/runs/:id`
+- `POST /api/warm-path/runs/:id/outreach-brief`
+- `POST /api/warm-path/runs/:id/message-pack`
+- `POST /api/warm-path/runs/:id/distribution-pack`
+- `POST /api/warm-path/runs/:id/intro-draft`
 
-| Alias | Resolves to |
-|---|---|
-| `@/*` | `apps/client/src/*` |
-| `@warmpath/shared/*` | `packages/shared/src/*` |
+Workflow + reminders:
 
-## Current API Slice
+- `GET /api/warm-path/runs/:id/workflow`
+- `POST /api/warm-path/runs/:id/workflow/track`
+- `POST /api/warm-path/runs/:id/reminders`
+- `PATCH /api/warm-path/runs/:id/reminders/:reminderId`
+
+Learning loop:
+
+- `GET /api/warm-path/learning/summary`
+- `POST /api/warm-path/learning/feedback`
+- `POST /api/warm-path/learning/auto-tune`
+
+Scout + jobs + contacts:
 
 - `POST /api/warm-path/jobs/sync`
-  - Syncs jobs from `jobs.hirefrank.com` into local SQLite cache.
 - `GET /api/warm-path/jobs`
-  - Lists cached jobs by advisor/company/category/location/source filters.
 - `POST /api/warm-path/contacts/import`
-  - Imports contacts from either `contacts[]` JSON payload or LinkedIn CSV string.
 - `GET /api/warm-path/contacts`
-  - Lists imported contacts, optionally filtered by company.
-- `POST /api/warm-path/rank`
-  - Ranks warm paths from provided `contact_signals`, or auto-derives from imported contacts + selected job.
-- `GET /api/warm-path/runs/:id`
-  - Returns persisted run and ranked paths.
-- `POST /api/warm-path/runs/:id/intro-draft`
-  - Generates an outreach draft from a ranked path.
 - `POST /api/warm-path/scout/run`
-  - Starts a Phase 5 second-degree scout run (currently scaffolded, provider-ready).
 - `GET /api/warm-path/scout/runs`
-  - Lists recent second-degree scout runs.
 - `GET /api/warm-path/scout/runs/:id`
-  - Returns one scout run with targets and connector paths.
 - `GET /api/warm-path/scout/stats`
-  - Returns aggregate scout run metrics by status and source.
 
-## Notes
+See:
 
-- Database file defaults to `warmpath.db` in project root.
-- Override DB path with `WARMPATH_DB_PATH`.
-- Ranking and run events are persisted for KPI tracking.
+- `docs/release-3-api.md`
+- `docs/release-notes.md`
 
-## LinkedIn Scout Config
+## Project Structure
 
-- `LINKEDIN_LI_AT`: LinkedIn session cookie used for 2nd-degree people search.
-- `LINKEDIN_RATE_LIMIT_MS` (optional): minimum delay between LinkedIn requests (default `1200`).
-- `LINKEDIN_REQUEST_TIMEOUT_MS` (optional): LinkedIn request timeout (default `15000`).
-- `SCOUT_MIN_TARGET_CONFIDENCE` (optional): minimum confidence threshold for saving discovered targets (default `0.45`).
-- `SCOUT_STATIC_TARGETS_JSON` (optional): JSON array of fallback targets for local/non-LinkedIn scouting.
-- `SCOUT_PROVIDER_ORDER` (optional): comma-separated provider order, default `linkedin_li_at,static_seed`.
-
-Without a valid `LINKEDIN_LI_AT`, scout runs still work with `seed_targets` but will return `needs_adapter` for live discovery.
-
-Scout request guardrails:
-
-- `target_company` required, 2-120 chars
-- `limit` must be 1-100
-- `seed_targets` max 100 entries
-
-## Example Flow
-
-1. Sync jobs:
-
-```bash
-curl -s -X POST http://localhost:3001/api/warm-path/jobs/sync \
-  -H 'content-type: application/json' \
-  -d '{"advisor_slug":"hirefrank","category":"product","source":"network"}'
+```text
+warmpath/
+├── apps/
+│   ├── server/           # Hono API, repositories, scoring, route tests
+│   └── client/           # React UI, sidebar workflow, API wrappers
+├── packages/
+│   └── shared/           # Cross-app TypeScript contracts
+└── docs/                 # Plans, API reference, release notes
 ```
 
-2. Import contacts:
+## Local-First and Safety Notes
 
-```bash
-curl -s -X POST http://localhost:3001/api/warm-path/contacts/import \
-  -H 'content-type: application/json' \
-  -d '{"contacts":[{"name":"Jamie Recruiter","current_title":"Senior Recruiter","current_company":"Capital One"}]}'
-```
+- Data is stored in local SQLite by default.
+- Draft context guardrails block unsafe instructions.
+- Raw emails/phones/LinkedIn URLs in context are sanitized and surfaced as warnings.
 
-3. Rank paths for a cached job:
+## License
 
-```bash
-curl -s -X POST http://localhost:3001/api/warm-path/rank \
-  -H 'content-type: application/json' \
-  -d '{"advisor_slug":"hirefrank","job_cache_id":"hirefrank:network:1138842"}'
-```
-
-4. Start a second-degree scout run (seed targets for now):
-
-```bash
-curl -s -X POST http://localhost:3001/api/warm-path/scout/run \
-  -H 'content-type: application/json' \
-  -d '{
-    "target_company":"Acme",
-    "target_function":"product",
-    "seed_targets":[
-      {"full_name":"Taylor Candidate","current_title":"Senior Product Manager","current_company":"Acme"}
-    ]
-  }'
-```
+MIT

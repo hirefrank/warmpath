@@ -3,12 +3,14 @@ import {
   createScoutRun,
   getScoutRunById,
   saveConnectorPaths,
+  saveScoutDiagnostics,
   saveScoutTargets,
   updateScoutRunStatus,
 } from "../../db/repositories/second-degree-scout";
 import { findContactsByCompany, listContacts } from "../../db/repositories/contacts";
 import { classifyAskType } from "../scoring/ask-type";
 import type {
+  ConnectorPathScoreBreakdown,
   ScoutAdapterAttempt,
   ScoutRunDiagnostics,
   ScoutSeedTarget,
@@ -21,6 +23,16 @@ const MAX_TARGETS_PER_RUN = 100;
 const MAX_SEED_TARGETS = 100;
 const MAX_CONNECTORS_PER_TARGET = 2;
 const MAX_CONNECTOR_PATHS = 120;
+
+const DEFAULT_SCOUT_V2_WEIGHTS = {
+  company_alignment: 24,
+  role_alignment: 18,
+  relationship: 18,
+  connector_influence: 14,
+  target_confidence: 12,
+  ask_fit: 8,
+  safety: 6,
+} as const;
 
 export interface ScoutProviderTarget {
   full_name: string;
@@ -60,14 +72,33 @@ export interface RunSecondDegreeScoutResult {
   diagnostics: ScoutRunDiagnostics;
 }
 
+interface ScoutV2Weights {
+  company_alignment: number;
+  role_alignment: number;
+  relationship: number;
+  connector_influence: number;
+  target_confidence: number;
+  ask_fit: number;
+  safety: number;
+}
+
+export interface RunSecondDegreeScoutOptions {
+  minTargetConfidence?: number;
+  scoutV2Weights?: Partial<ScoutV2Weights>;
+}
+
 export async function runSecondDegreeScout(
   database: Database,
   request: SecondDegreeScoutRequest,
-  providers: ScoutProvider | ScoutProvider[] = [new NoopScoutProvider()]
+  providers: ScoutProvider | ScoutProvider[] = [new NoopScoutProvider()],
+  options: RunSecondDegreeScoutOptions = {}
 ): Promise<RunSecondDegreeScoutResult> {
   const runId = crypto.randomUUID();
   const limit = clampLimit(request.limit ?? 25);
-  const minConfidence = parseMinConfidence(process.env.SCOUT_MIN_TARGET_CONFIDENCE);
+  const minConfidence = options.minTargetConfidence !== undefined
+    ? parseMinConfidenceValue(options.minTargetConfidence)
+    : parseMinConfidence(process.env.SCOUT_MIN_TARGET_CONFIDENCE);
+  const scoutV2Weights = resolveScoutV2Weights(options.scoutV2Weights);
   const providerChain = normalizeProviderChain(providers);
   const initialSource = request.seed_targets?.length ? "seed_targets" : providerChain[0]?.name ?? "noop";
 
@@ -104,6 +135,8 @@ export async function runSecondDegreeScout(
         diagnostics.used_seed_targets ||
         diagnostics.adapter_attempts.some((attempt) => attempt.status !== "not_configured");
 
+      saveScoutDiagnostics(database, diagnostics);
+
       updateScoutRunStatus(
         database,
         runId,
@@ -130,9 +163,11 @@ export async function runSecondDegreeScout(
       database,
       request.target_company,
       request.target_function,
-      savedTargets
+      savedTargets,
+      scoutV2Weights
     );
     saveConnectorPaths(database, runId, connectorPaths);
+    saveScoutDiagnostics(database, diagnostics);
 
     updateScoutRunStatus(
       database,
@@ -159,6 +194,7 @@ export async function runSecondDegreeScout(
       error instanceof Error ? error.message : String(error),
       diagnostics.source
     );
+    saveScoutDiagnostics(database, diagnostics);
 
     const run = getScoutRunById(database, runId);
     if (!run) {
@@ -362,7 +398,8 @@ function buildConnectorPaths(
     current_title?: string;
     current_company?: string;
     confidence: number;
-  }>
+  }>,
+  weights: ScoutV2Weights
 ): Array<{
   target_id: string;
   connector_contact_id?: string;
@@ -371,6 +408,7 @@ function buildConnectorPaths(
   path_score: number;
   rationale?: string;
   recommended_ask?: "context" | "intro" | "referral";
+  score_breakdown?: ConnectorPathScoreBreakdown;
 }> {
   const companyConnectors = findContactsByCompany(database, targetCompany);
   const fallbackConnectors = listContacts(database, 200);
@@ -389,6 +427,7 @@ function buildConnectorPaths(
     path_score: number;
     rationale?: string;
     recommended_ask?: "context" | "intro" | "referral";
+    score_breakdown?: ConnectorPathScoreBreakdown;
   }> = [];
 
   for (const target of targets) {
@@ -401,6 +440,7 @@ function buildConnectorPaths(
           targetCompany,
           functionToken,
           connectorStrength,
+          weights,
         });
       })
       .sort((a, b) => b.pathScore - a.pathScore)
@@ -415,6 +455,7 @@ function buildConnectorPaths(
         path_score: candidate.pathScore,
         rationale: candidate.rationale,
         recommended_ask: candidate.ask,
+        score_breakdown: candidate.scoreBreakdown,
       });
 
       if (connectorPaths.length >= MAX_CONNECTOR_PATHS) {
@@ -453,6 +494,7 @@ function scoreConnectorPath(input: {
   targetCompany: string;
   functionToken: string;
   connectorStrength: number;
+  weights: ScoutV2Weights;
 }): {
   connector: {
     id: string;
@@ -464,43 +506,312 @@ function scoreConnectorPath(input: {
   pathScore: number;
   ask: "context" | "intro" | "referral";
   rationale: string;
+  scoreBreakdown: ConnectorPathScoreBreakdown;
 } {
   const connectorTitle = (input.connector.current_title ?? "").toLowerCase();
   const targetTitle = (input.target.current_title ?? "").toLowerCase();
   const connectorCompany = (input.connector.current_company ?? "").toLowerCase();
-  const companyMatch = connectorCompany.includes(input.targetCompany.toLowerCase());
-  const ask = classifyAskType(input.connector.current_title ?? "");
+  const targetCompanyNeedle = input.targetCompany.toLowerCase();
+  const targetCurrentCompany = (input.target.current_company ?? "").toLowerCase();
+  const companyMatch = connectorCompany.includes(targetCompanyNeedle);
+  const sharedTargetCompany =
+    targetCurrentCompany.length > 0 && connectorCompany.includes(targetCurrentCompany);
+  const baseAsk = classifyAskType(input.connector.current_title ?? "");
 
   const targetTokens = targetTitle.split(/\s+/).filter((token) => token.length > 2);
   const titleOverlap = targetTokens.filter((token) => connectorTitle.includes(token)).length;
   const functionMatch = input.functionToken && connectorTitle.includes(input.functionToken) ? 1 : 0;
+  const seniorityAlignment = estimateSeniorityAlignment(connectorTitle, targetTitle);
+  const connectorInfluence = estimateConnectorInfluence(connectorTitle);
 
-  const companyScore = companyMatch ? 32 : 10;
-  const functionScore = Math.min(22, titleOverlap * 6 + functionMatch * 10);
-  const relationshipScore = Math.round(input.connectorStrength * 28);
-  const targetConfidenceScore = Math.round(input.target.confidence * 18);
-  const askBonus = ask === "referral" ? 6 : ask === "context" ? 4 : 2;
+  const companyAlignmentSignal = companyMatch ? 1 : sharedTargetCompany ? 0.72 : 0.35;
+  const roleAlignmentSignal = clamp01(titleOverlap * 0.24 + functionMatch * 0.34 + seniorityAlignment * 0.42);
+  const relationshipSignal = clamp01(input.connectorStrength);
+  const targetConfidenceSignal = clamp01(input.target.confidence);
+  const hasCompanyContext = companyMatch || sharedTargetCompany;
+  const askFitSignal = estimateAskFitSignal({
+    ask: baseAsk,
+    connectorInfluence,
+    relationshipSignal,
+    targetConfidenceSignal,
+    hasCompanyContext,
+  });
+  const safetySignal = estimateSafetySignal({
+    connectorStrength: relationshipSignal,
+    targetConfidence: targetConfidenceSignal,
+    hasCompanyContext,
+    connectorInfluence,
+  });
 
-  const rawScore = companyScore + functionScore + relationshipScore + targetConfidenceScore + askBonus;
-  const pathScore = Math.max(0, Math.min(100, rawScore));
+  const totalBeforeGuardrails =
+    scoreByWeight(companyAlignmentSignal, input.weights.company_alignment) +
+    scoreByWeight(roleAlignmentSignal, input.weights.role_alignment) +
+    scoreByWeight(relationshipSignal, input.weights.relationship) +
+    scoreByWeight(connectorInfluence, input.weights.connector_influence) +
+    scoreByWeight(targetConfidenceSignal, input.weights.target_confidence) +
+    scoreByWeight(askFitSignal, input.weights.ask_fit) +
+    scoreByWeight(safetySignal, input.weights.safety);
+
+  const guardrailResult = applyAskGuardrails({
+    ask: baseAsk,
+    connectorStrength: relationshipSignal,
+    targetConfidence: targetConfidenceSignal,
+    safetySignal,
+    hasCompanyContext,
+  });
+
+  const guardrailPenalty = guardrailResult.adjustments.length * 4;
+  const pathScore = Math.max(0, Math.min(100, Math.round((totalBeforeGuardrails - guardrailPenalty) * 100) / 100));
+  const qualityTier = classifyQualityTier(pathScore, safetySignal);
 
   const rationaleParts: string[] = [];
   if (companyMatch) rationaleParts.push("direct company match");
-  if (functionScore >= 14) rationaleParts.push("strong function/title alignment");
-  if (relationshipScore >= 20) rationaleParts.push("high connector strength");
-  if (targetConfidenceScore >= 12) rationaleParts.push("high target confidence");
+  else if (sharedTargetCompany) rationaleParts.push("shared target-company context");
+  if (roleAlignmentSignal >= 0.62) rationaleParts.push("strong function/title alignment");
+  if (seniorityAlignment >= 0.7) rationaleParts.push("good seniority alignment");
+  if (connectorInfluence >= 0.65) rationaleParts.push("high-influence connector role");
+  if (relationshipSignal >= 0.72) rationaleParts.push("high connector strength");
+  if (targetConfidenceSignal >= 0.7) rationaleParts.push("high target confidence");
+  if (safetySignal < 0.6) rationaleParts.push("safety constraints applied");
 
-  const rationale = rationaleParts.length > 0
+  const rationalePrefix = rationaleParts.length > 0
     ? `Path ranks well due to ${rationaleParts.join(", ")}.`
     : "Path is viable but lower-confidence than other options.";
+
+  const rationale = guardrailResult.adjustments.length > 0
+    ? `${rationalePrefix} Ask guardrails: ${guardrailResult.adjustments.join(", ")}.`
+    : rationalePrefix;
+
+  const scoreBreakdown: ConnectorPathScoreBreakdown = {
+    scoring_version: "v2",
+    company_alignment: scoreByWeight(companyAlignmentSignal, input.weights.company_alignment),
+    role_alignment: scoreByWeight(roleAlignmentSignal, input.weights.role_alignment),
+    relationship: scoreByWeight(relationshipSignal, input.weights.relationship),
+    connector_influence: scoreByWeight(connectorInfluence, input.weights.connector_influence),
+    target_confidence: scoreByWeight(targetConfidenceSignal, input.weights.target_confidence),
+    ask_fit: scoreByWeight(askFitSignal, input.weights.ask_fit),
+    safety: scoreByWeight(safetySignal, input.weights.safety),
+    total_before_guardrails: Math.round(totalBeforeGuardrails * 100) / 100,
+    guardrail_penalty: guardrailPenalty,
+    quality_tier: qualityTier,
+    guardrail_adjustments: guardrailResult.adjustments,
+  };
 
   return {
     connector: input.connector,
     connectorStrength: input.connectorStrength,
     pathScore,
-    ask,
+    ask: guardrailResult.ask,
     rationale,
+    scoreBreakdown,
   };
+}
+
+function scoreByWeight(signal: number, weight: number): number {
+  return Math.round(clamp01(signal) * weight * 100) / 100;
+}
+
+function clamp01(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(1, value));
+}
+
+function classifyQualityTier(pathScore: number, safetySignal: number): "high" | "medium" | "low" {
+  if (pathScore >= 80 && safetySignal >= 0.65) {
+    return "high";
+  }
+
+  if (pathScore >= 65 && safetySignal >= 0.45) {
+    return "medium";
+  }
+
+  return "low";
+}
+
+function estimateAskFitSignal(input: {
+  ask: "context" | "intro" | "referral";
+  connectorInfluence: number;
+  relationshipSignal: number;
+  targetConfidenceSignal: number;
+  hasCompanyContext: boolean;
+}): number {
+  const confidenceBlend =
+    input.connectorInfluence * 0.4 +
+    input.relationshipSignal * 0.35 +
+    input.targetConfidenceSignal * 0.25;
+
+  if (input.ask === "referral") {
+    return clamp01(confidenceBlend + (input.hasCompanyContext ? 0.1 : -0.05));
+  }
+
+  if (input.ask === "intro") {
+    return clamp01(0.65 + confidenceBlend * 0.25 + (input.hasCompanyContext ? 0.05 : 0));
+  }
+
+  return clamp01(0.6 + input.relationshipSignal * 0.2 + (input.hasCompanyContext ? 0.08 : 0));
+}
+
+function estimateSafetySignal(input: {
+  connectorStrength: number;
+  targetConfidence: number;
+  hasCompanyContext: boolean;
+  connectorInfluence: number;
+}): number {
+  let safety = 0.35;
+  safety += input.hasCompanyContext ? 0.2 : 0;
+  safety += input.connectorStrength * 0.25;
+  safety += input.targetConfidence * 0.15;
+  safety += input.connectorInfluence * 0.05;
+
+  if (!input.hasCompanyContext) {
+    safety -= 0.1;
+  }
+
+  return clamp01(safety);
+}
+
+function applyAskGuardrails(input: {
+  ask: "context" | "intro" | "referral";
+  connectorStrength: number;
+  targetConfidence: number;
+  safetySignal: number;
+  hasCompanyContext: boolean;
+}): {
+  ask: "context" | "intro" | "referral";
+  adjustments: string[];
+} {
+  const adjustments: string[] = [];
+  let ask = input.ask;
+
+  if (ask === "referral" && (!input.hasCompanyContext || input.safetySignal < 0.62)) {
+    ask = "intro";
+    adjustments.push("downgraded referral to intro due to weak company context/safety");
+  }
+
+  if (ask === "referral" && (input.connectorStrength < 0.7 || input.targetConfidence < 0.65)) {
+    ask = "intro";
+    adjustments.push("downgraded referral to intro due to low connector strength/target confidence");
+  }
+
+  if (ask === "intro" && (input.connectorStrength < 0.45 || input.targetConfidence < 0.5)) {
+    ask = "context";
+    adjustments.push("downgraded intro to context due to low confidence");
+  }
+
+  return {
+    ask,
+    adjustments,
+  };
+}
+
+function estimateSeniorityAlignment(connectorTitle: string, targetTitle: string): number {
+  const connectorLevel = inferSeniorityLevel(connectorTitle);
+  const targetLevel = inferSeniorityLevel(targetTitle);
+
+  if (connectorLevel === "unknown" || targetLevel === "unknown") {
+    return 0.4;
+  }
+
+  if (connectorLevel === targetLevel) {
+    return 1;
+  }
+
+  const distance = Math.abs(connectorLevel - targetLevel);
+  if (distance === 1) {
+    return 0.7;
+  }
+
+  return 0.25;
+}
+
+function estimateConnectorInfluence(title: string): number {
+  let influence = 0.3;
+
+  if (/(chief|vp|vice president|head|director|founder|partner)/i.test(title)) {
+    influence += 0.35;
+  }
+
+  if (/(recruiter|talent|hiring|people|staffing)/i.test(title)) {
+    influence += 0.35;
+  }
+
+  if (/(manager|lead)/i.test(title)) {
+    influence += 0.15;
+  }
+
+  return Math.max(0, Math.min(1, Number(influence.toFixed(2))));
+}
+
+function inferSeniorityLevel(title: string): number | "unknown" {
+  if (!title.trim()) {
+    return "unknown";
+  }
+
+  if (/(chief|vp|vice president|head|director|founder|partner)/i.test(title)) {
+    return 4;
+  }
+
+  if (/(manager|lead)/i.test(title)) {
+    return 3;
+  }
+
+  if (/(senior|staff|principal)/i.test(title)) {
+    return 2;
+  }
+
+  if (/(associate|assistant|coordinator|intern|junior)/i.test(title)) {
+    return 0;
+  }
+
+  return 1;
+}
+
+function loadScoutV2WeightsFromEnv(): ScoutV2Weights {
+  const raw: ScoutV2Weights = {
+    company_alignment: parseWeight(process.env.SCOUT_V2_WEIGHT_COMPANY_ALIGNMENT, DEFAULT_SCOUT_V2_WEIGHTS.company_alignment),
+    role_alignment: parseWeight(process.env.SCOUT_V2_WEIGHT_ROLE_ALIGNMENT, DEFAULT_SCOUT_V2_WEIGHTS.role_alignment),
+    relationship: parseWeight(process.env.SCOUT_V2_WEIGHT_RELATIONSHIP, DEFAULT_SCOUT_V2_WEIGHTS.relationship),
+    connector_influence: parseWeight(process.env.SCOUT_V2_WEIGHT_CONNECTOR_INFLUENCE, DEFAULT_SCOUT_V2_WEIGHTS.connector_influence),
+    target_confidence: parseWeight(process.env.SCOUT_V2_WEIGHT_TARGET_CONFIDENCE, DEFAULT_SCOUT_V2_WEIGHTS.target_confidence),
+    ask_fit: parseWeight(process.env.SCOUT_V2_WEIGHT_ASK_FIT, DEFAULT_SCOUT_V2_WEIGHTS.ask_fit),
+    safety: parseWeight(process.env.SCOUT_V2_WEIGHT_SAFETY, DEFAULT_SCOUT_V2_WEIGHTS.safety),
+  };
+
+  const total =
+    raw.company_alignment +
+    raw.role_alignment +
+    raw.relationship +
+    raw.connector_influence +
+    raw.target_confidence +
+    raw.ask_fit +
+    raw.safety;
+
+  if (total <= 0) {
+    return { ...DEFAULT_SCOUT_V2_WEIGHTS };
+  }
+
+  const normalize = (value: number): number => Math.round((value / total) * 10000) / 100;
+  return {
+    company_alignment: normalize(raw.company_alignment),
+    role_alignment: normalize(raw.role_alignment),
+    relationship: normalize(raw.relationship),
+    connector_influence: normalize(raw.connector_influence),
+    target_confidence: normalize(raw.target_confidence),
+    ask_fit: normalize(raw.ask_fit),
+    safety: normalize(raw.safety),
+  };
+}
+
+function parseWeight(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.max(0, Math.min(100, parsed));
 }
 
 function clampLimit(limit: number): number {

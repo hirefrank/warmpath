@@ -68,8 +68,20 @@ This plan combines three feature tracks:
   - Scout stats endpoint and UI summary metrics
   - Scout request guardrails and target confidence filtering
   - Improved connector path scoring (multi-signal ranking, richer rationale)
-- In progress:
-  - Expand provider strategies beyond HTML scraping (multi-adapter chain)
+  - Multi-adapter scout provider chain with fallback order controls
+  - Static scout fallback provider (`SCOUT_STATIC_TARGETS_JSON`) for local/non-LinkedIn discovery
+  - Persisted scout diagnostics + adapter attempts with detail endpoint hydration
+  - Scout runs list diagnostics summaries for quick adapter-health triage
+  - Build Path lane scaffold in UI (sidebar step, candidate panel, filter controls)
+  - Build Path handoff into Rank preselection and Draft extra-context prefill
+  - Phase 7 scoring engine v2 for indirect paths (weighted dimensions + guardrail-aware score breakdowns)
+  - Phase 8 Build Path lane UX hardening (one-click use-and-rank, context source chips, reset controls)
+  - Phase 9 trust-and-safety guardrails (draft context sanitization, unsafe-instruction blocking, warning surfacing)
+  - Phase 10 structured outreach brief generator (new brief endpoint, UI panel rendering, draft generation powered by structured brief data)
+  - Phase 11 email + DM + follow-up generation (message pack endpoint with channel variants, follow-up plan, and Draft-step rendering)
+  - Phase 12 workflow tracking and reminders (status timeline + reminder scheduling/update APIs with Draft-step controls)
+  - Phase 13 learning loop and auto-tuning (feedback capture, learning summary, auto-tuned scoring profiles, and active-profile ranking)
+  - Phase 14 packaging and distribution modes (distribution pack endpoint with JSON bundle, markdown playbook, and CRM note artifacts)
 
 ### Phase 0 - Success Metrics
 
@@ -158,3 +170,7 @@ Acceptance criteria:
 ## Engineering Map (Files + Endpoints)
 
 See `docs/phase-0-4-build-tickets.md` for exact files and ticket-level scope.
+
+Release 3 API reference is documented in `docs/release-3-api.md`.
+
+Release notes are documented in `docs/release-notes.md`.

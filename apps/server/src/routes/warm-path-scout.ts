@@ -1,14 +1,16 @@
 import { Hono } from "hono";
 import { getDatabase } from "../db";
 import {
+  getScoutDiagnosticsByRunId,
   getScoutRunStats,
   getScoutRunById,
+  listScoutDiagnosticsSummariesByRunIds,
   listScoutRuns,
 } from "../db/repositories/second-degree-scout";
 import { createScoutProviderChainFromEnv } from "../lib/scout/scout-provider-chain";
 import { runSecondDegreeScout } from "../lib/scout/second-degree-scout";
-import type { SecondDegreeScoutRequest } from "../../../../packages/shared/src/contracts/scout";
 import { saveEvent } from "../db/repositories/warm-path-runs";
+import type { SecondDegreeScoutRequest } from "../../../../packages/shared/src/contracts/scout";
 import type { WarmPathEvent } from "../../../../packages/shared/src/contracts/warm-path";
 
 const app = new Hono();
@@ -53,8 +55,15 @@ app.post("/api/warm-path/scout/run", async (c) => {
 });
 
 app.get("/api/warm-path/scout/runs", (c) => {
+  const db = getDatabase();
   const limit = Number(c.req.query("limit") ?? "20");
-  const runs = listScoutRuns(getDatabase(), limit).map((run) => ({
+  const scoutRuns = listScoutRuns(db, limit);
+  const diagnosticsByRunId = listScoutDiagnosticsSummariesByRunIds(
+    db,
+    scoutRuns.map((run) => run.id)
+  );
+
+  const runs = scoutRuns.map((run) => ({
     id: run.id,
     target_company: run.target_company,
     target_function: run.target_function,
@@ -64,18 +73,21 @@ app.get("/api/warm-path/scout/runs", (c) => {
     notes: run.notes,
     created_at: run.created_at,
     updated_at: run.updated_at,
+    diagnostics_summary: diagnosticsByRunId[run.id],
   }));
 
   return c.json({ runs, total: runs.length });
 });
 
 app.get("/api/warm-path/scout/runs/:id", (c) => {
-  const run = getScoutRunById(getDatabase(), c.req.param("id"));
+  const db = getDatabase();
+  const run = getScoutRunById(db, c.req.param("id"));
   if (!run) {
     return c.json({ error: "Scout run not found" }, 404);
   }
 
-  return c.json({ run });
+  const diagnostics = getScoutDiagnosticsByRunId(db, run.id);
+  return c.json({ run, diagnostics: diagnostics ?? undefined });
 });
 
 app.get("/api/warm-path/scout/stats", (c) => {
