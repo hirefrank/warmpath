@@ -1,34 +1,74 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&display=swap");
 @import "tailwindcss";
 
 @theme {
-  --color-background: oklch(1 0 0);
-  --color-foreground: oklch(0.145 0 0);
-  --color-card: oklch(1 0 0);
-  --color-card-foreground: oklch(0.145 0 0);
-  --color-popover: oklch(1 0 0);
-  --color-popover-foreground: oklch(0.145 0 0);
-  --color-primary: oklch(0.205 0 0);
-  --color-primary-foreground: oklch(0.985 0 0);
-  --color-secondary: oklch(0.965 0 0);
-  --color-secondary-foreground: oklch(0.205 0 0);
-  --color-muted: oklch(0.965 0 0);
-  --color-muted-foreground: oklch(0.556 0 0);
-  --color-accent: oklch(0.965 0 0);
-  --color-accent-foreground: oklch(0.205 0 0);
-  --color-destructive: oklch(0.577 0.245 27.325);
-  --color-destructive-foreground: oklch(0.577 0.245 27.325);
-  --color-border: oklch(0.922 0 0);
-  --color-input: oklch(0.922 0 0);
-  --color-ring: oklch(0.708 0 0);
-  --color-sidebar-background: oklch(0.985 0 0);
-  --color-sidebar-foreground: oklch(0.145 0 0);
-  --color-sidebar-primary: oklch(0.205 0 0);
-  --color-sidebar-primary-foreground: oklch(0.985 0 0);
-  --color-sidebar-accent: oklch(0.965 0 0);
-  --color-sidebar-accent-foreground: oklch(0.205 0 0);
-  --color-sidebar-border: oklch(0.922 0 0);
-  --color-sidebar-ring: oklch(0.708 0 0);
-  --radius: 0.625rem;
+  /* Warm ivory content surface */
+  --color-background: oklch(0.975 0.005 80);
+  --color-foreground: oklch(0.18 0.01 50);
+
+  /* Cards: slightly warmer than background */
+  --color-card: oklch(0.99 0.003 80);
+  --color-card-foreground: oklch(0.18 0.01 50);
+
+  --color-popover: oklch(0.99 0.003 80);
+  --color-popover-foreground: oklch(0.18 0.01 50);
+
+  /* Primary: warm terracotta amber */
+  --color-primary: oklch(0.58 0.14 45);
+  --color-primary-foreground: oklch(0.99 0.003 80);
+
+  /* Secondary: warm sand */
+  --color-secondary: oklch(0.935 0.015 75);
+  --color-secondary-foreground: oklch(0.30 0.03 50);
+
+  /* Muted: warm light gray */
+  --color-muted: oklch(0.945 0.01 75);
+  --color-muted-foreground: oklch(0.48 0.02 50);
+
+  /* Accent: warm highlight */
+  --color-accent: oklch(0.92 0.025 70);
+  --color-accent-foreground: oklch(0.25 0.02 50);
+
+  /* Destructive */
+  --color-destructive: oklch(0.55 0.22 25);
+  --color-destructive-foreground: oklch(0.55 0.22 25);
+
+  /* Borders and inputs: warm-tinted */
+  --color-border: oklch(0.895 0.012 70);
+  --color-input: oklch(0.895 0.012 70);
+  --color-ring: oklch(0.58 0.14 45);
+
+  /* Sidebar: deep charcoal with warm undertone */
+  --color-sidebar-background: oklch(0.17 0.015 55);
+  --color-sidebar-foreground: oklch(0.88 0.015 70);
+  --color-sidebar-primary: oklch(0.72 0.13 55);
+  --color-sidebar-primary-foreground: oklch(0.17 0.015 55);
+  --color-sidebar-accent: oklch(0.24 0.02 55);
+  --color-sidebar-accent-foreground: oklch(0.94 0.01 70);
+  --color-sidebar-border: oklch(0.28 0.015 55);
+  --color-sidebar-ring: oklch(0.72 0.13 55);
+  --color-sidebar-muted: oklch(0.48 0.015 55);
+
+  --radius: 0.5rem;
+
+  /* Warm score colors */
+  --color-score-high: oklch(0.65 0.16 55);
+  --color-score-mid: oklch(0.72 0.13 65);
+  --color-score-low: oklch(0.60 0.08 75);
+
+  /* Dimension colors */
+  --color-dim-company: oklch(0.62 0.15 50);
+  --color-dim-role: oklch(0.65 0.13 160);
+  --color-dim-relationship: oklch(0.58 0.16 300);
+  --color-dim-context: oklch(0.72 0.14 70);
+  --color-dim-confidence: oklch(0.62 0.14 20);
+
+  /* Animation tokens */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
 }
 
 @layer base {
@@ -38,9 +78,101 @@
   ::backdrop {
     border-color: var(--color-border);
   }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    font-family: system-ui, -apple-system, sans-serif;
+    font-family: "DM Sans", system-ui, sans-serif;
+    font-optical-sizing: auto;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "Fraunces", "Georgia", serif;
+    font-optical-sizing: auto;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: "Fraunces", "Georgia", serif;
+    font-optical-sizing: auto;
+  }
+
+  .font-body {
+    font-family: "DM Sans", system-ui, sans-serif;
+  }
+
+  /* Warm background grain texture */
+  .bg-grain {
+    position: relative;
+  }
+  .bg-grain::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Stagger animation delays */
+  .stagger-1 { animation-delay: 50ms; }
+  .stagger-2 { animation-delay: 100ms; }
+  .stagger-3 { animation-delay: 150ms; }
+  .stagger-4 { animation-delay: 200ms; }
+  .stagger-5 { animation-delay: 250ms; }
+  .stagger-6 { animation-delay: 300ms; }
+
+  /* Warm gradient for score bars */
+  .bg-score-gradient {
+    background: linear-gradient(90deg, oklch(0.72 0.13 65), oklch(0.62 0.16 50), oklch(0.55 0.18 35));
+  }
+}
+
+@layer components {
+  /* Fade-in-up animation for panels */
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in-up {
+    animation: fadeInUp var(--duration-slow) var(--ease-out-expo) both;
+  }
+
+  /* Subtle pulse for loading states */
+  @keyframes warmPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  .animate-warm-pulse {
+    animation: warmPulse 1.8s ease-in-out infinite;
+  }
+
+  /* Shimmer effect for loading */
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      oklch(0.945 0.01 75) 25%,
+      oklch(0.92 0.02 70) 50%,
+      oklch(0.945 0.01 75) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s ease-in-out infinite;
   }
 }

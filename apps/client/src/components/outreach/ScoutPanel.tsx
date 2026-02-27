@@ -13,6 +13,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
+import { Search, ChevronRight, Zap, AlertTriangle } from "lucide-react";
 
 interface ScoutPanelProps {
   runs: SecondDegreeScoutRun[];
@@ -54,27 +56,35 @@ export function ScoutPanel(props: ScoutPanelProps) {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>2nd-Degree Scout</CardTitle>
-          <CardDescription>
-            Run a scout to find likely 2nd-degree targets and connector paths.
-          </CardDescription>
+      <Card className="animate-fade-in-up overflow-hidden">
+        <CardHeader className="border-b border-border/50 bg-accent/30">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+              <Search className="size-4 text-primary" />
+            </div>
+            <div>
+              <CardTitle>2nd-Degree Scout</CardTitle>
+              <CardDescription>
+                Find likely 2nd-degree targets and connector paths through your network.
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-5">
           <div className="space-y-2">
             <Label htmlFor="target-company">Target company</Label>
             <Input
               id="target-company"
               value={targetCompany}
               onChange={(event) => setTargetCompany(event.currentTarget.value)}
-              placeholder="Acme"
+              placeholder="e.g. Stripe"
+              className="font-medium"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="target-function">Target function (optional)</Label>
+              <Label htmlFor="target-function">Function (optional)</Label>
               <Input
                 id="target-function"
                 value={targetFunction}
@@ -83,7 +93,7 @@ export function ScoutPanel(props: ScoutPanelProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="target-title">Target title (optional)</Label>
+              <Label htmlFor="target-title">Title (optional)</Label>
               <Input
                 id="target-title"
                 value={targetTitle}
@@ -121,8 +131,19 @@ export function ScoutPanel(props: ScoutPanelProps) {
           <Button
             disabled={props.isRunning || targetCompany.trim().length === 0}
             onClick={() => void handleRun()}
+            className="gap-2"
           >
-            {props.isRunning ? "Running scout..." : "Run Scout"}
+            {props.isRunning ? (
+              <>
+                <div className="size-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
+                Running scout...
+              </>
+            ) : (
+              <>
+                <Search className="size-4" />
+                Run Scout
+              </>
+            )}
           </Button>
 
           {props.notes ? (
@@ -131,32 +152,57 @@ export function ScoutPanel(props: ScoutPanelProps) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="animate-fade-in-up stagger-2">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Recent Scout Runs
+          <div className="flex items-center justify-between">
+            <CardTitle>Recent Scout Runs</CardTitle>
             {props.stats ? (
-              <Badge variant="secondary">
-                {props.stats.total} total / {props.stats.by_status.completed ?? 0} completed
-              </Badge>
+              <div className="flex items-center gap-1.5">
+                <Badge variant="secondary" className="font-mono text-[10px]">
+                  {props.stats.total} total
+                </Badge>
+                <Badge variant="outline" className="font-mono text-[10px]">
+                  {props.stats.by_status.completed ?? 0} completed
+                </Badge>
+              </div>
             ) : null}
-          </CardTitle>
+          </div>
         </CardHeader>
         <CardContent>
           {props.runs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No scout runs yet.</p>
+            <div className="rounded-lg border border-dashed border-border/60 p-6 text-center">
+              <Search className="mx-auto mb-2 size-5 text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">No scout runs yet. Run your first scout above.</p>
+            </div>
           ) : (
             <div className="space-y-1">
-              {props.runs.map((run) => (
+              {props.runs.map((run, index) => (
                 <button
                   key={run.id}
                   onClick={() => void props.onSelectRun(run.id)}
-                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
+                  className={cn(
+                    "group flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-all duration-200",
+                    props.selectedRun?.id === run.id
+                      ? "bg-primary/8 ring-1 ring-primary/20"
+                      : "hover:bg-accent/60",
+                    `stagger-${Math.min(index + 1, 6)}`,
+                  )}
                 >
-                  <span className="font-medium">{run.target_company}</span>
-                  <Badge variant={run.status === "completed" ? "default" : "outline"}>
-                    {run.status}
-                  </Badge>
+                  <div className="space-y-0.5">
+                    <p className="font-medium">{run.target_company}</p>
+                    {run.diagnostics_summary ? (
+                      <p className="font-mono text-[10px] text-muted-foreground">
+                        {run.diagnostics_summary.source} / {run.diagnostics_summary.adapter_count} adapters
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {renderDiagnosticsSummaryBadge(run)}
+                    <Badge variant={run.status === "completed" ? "default" : "outline"} className="text-[10px]">
+                      {run.status}
+                    </Badge>
+                    <ChevronRight className="size-3.5 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5" />
+                  </div>
                 </button>
               ))}
             </div>
@@ -164,33 +210,42 @@ export function ScoutPanel(props: ScoutPanelProps) {
 
           {props.selectedRun ? (
             <>
-              <Separator className="my-4" />
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-semibold">Run: {props.selectedRun.id.slice(0, 8)}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Status: {props.selectedRun.status} | Source: {props.selectedRun.source}
-                  </p>
-                  {props.selectedRun.notes ? (
-                    <p className="mt-1 text-sm">{props.selectedRun.notes}</p>
-                  ) : null}
+              <Separator className="my-5" />
+              <div className="space-y-4 animate-fade-in-up">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-display font-semibold">Run: {props.selectedRun.id.slice(0, 8)}</h3>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Badge variant="outline" className="text-[10px]">{props.selectedRun.status}</Badge>
+                      <span className="text-xs text-muted-foreground">Source: {props.selectedRun.source}</span>
+                    </div>
+                  </div>
                 </div>
+                {props.selectedRun.notes ? (
+                  <p className="text-sm text-muted-foreground">{props.selectedRun.notes}</p>
+                ) : null}
 
                 {runDiagnostics ? (
-                  <div className="rounded-md border bg-muted/40 p-3">
-                    <h4 className="mb-2 text-sm font-medium">Adapter diagnostics</h4>
-                    <p className="text-xs text-muted-foreground">
-                      source={runDiagnostics.source} | limit={runDiagnostics.effective_limit} | min_confidence={runDiagnostics.min_confidence}
+                  <div className="rounded-lg border bg-accent/30 p-4">
+                    <h4 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      <Zap className="size-3" />
+                      Adapter Diagnostics
+                    </h4>
+                    <p className="mb-3 font-mono text-[10px] text-muted-foreground">
+                      source={runDiagnostics.source} / limit={runDiagnostics.effective_limit} / min_conf={runDiagnostics.min_confidence}
                     </p>
-                    <div className="mt-2 space-y-1">
+                    <div className="space-y-1">
                       {runDiagnostics.adapter_attempts.map((attempt) => (
-                        <div key={attempt.adapter} className="flex items-center justify-between rounded-md bg-background px-2 py-1.5 text-xs">
+                        <div key={attempt.adapter} className="flex items-center justify-between rounded-md bg-card px-3 py-2 text-xs">
                           <span className="font-medium">{attempt.adapter}</span>
                           <div className="flex items-center gap-2">
-                            <Badge variant={attempt.status === "success" ? "default" : "outline"}>
+                            <Badge
+                              variant={attempt.status === "success" ? "default" : "outline"}
+                              className="text-[10px]"
+                            >
                               {attempt.status}
                             </Badge>
-                            <span className="text-muted-foreground">{attempt.result_count} hits</span>
+                            <span className="font-mono text-muted-foreground">{attempt.result_count} hits</span>
                           </div>
                         </div>
                       ))}
@@ -200,10 +255,12 @@ export function ScoutPanel(props: ScoutPanelProps) {
 
                 {props.selectedRun.targets.length > 0 && (
                   <div>
-                    <h4 className="mb-2 text-sm font-medium">Targets</h4>
+                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Targets ({props.selectedRun.targets.length})
+                    </h4>
                     <div className="space-y-1">
                       {props.selectedRun.targets.map((target) => (
-                        <div key={target.id} className="rounded-md bg-muted px-3 py-2 text-sm">
+                        <div key={target.id} className="rounded-lg bg-accent/40 px-3 py-2 text-sm">
                           <span className="font-medium">{target.full_name}</span>
                           <span className="text-muted-foreground">
                             {" "}&mdash; {target.current_title ?? "N/A"} @ {target.current_company ?? "N/A"}
@@ -216,14 +273,16 @@ export function ScoutPanel(props: ScoutPanelProps) {
 
                 {props.selectedRun.connector_paths.length > 0 && (
                   <div>
-                    <h4 className="mb-2 text-sm font-medium">Connector Paths</h4>
+                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Connector Paths ({props.selectedRun.connector_paths.length})
+                    </h4>
                     <div className="space-y-1">
                       {props.selectedRun.connector_paths.map((path) => (
-                        <div key={path.id} className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-sm">
+                        <div key={path.id} className="flex items-center justify-between rounded-lg bg-accent/40 px-3 py-2 text-sm">
                           <span className="font-medium">{path.connector_name}</span>
                           <div className="flex items-center gap-2">
-                            <Badge variant="secondary">{path.path_score}</Badge>
-                            <Badge variant="outline">{path.recommended_ask ?? "intro"}</Badge>
+                            <Badge variant="secondary" className="font-mono text-[10px]">{path.path_score}</Badge>
+                            <Badge variant="outline" className="text-[10px]">{path.recommended_ask ?? "intro"}</Badge>
                           </div>
                         </div>
                       ))}
@@ -237,6 +296,32 @@ export function ScoutPanel(props: ScoutPanelProps) {
       </Card>
     </div>
   );
+}
+
+function renderDiagnosticsSummaryBadge(run: SecondDegreeScoutRun) {
+  const summary = run.diagnostics_summary;
+  if (!summary) {
+    return null;
+  }
+
+  if (summary.error_count > 0) {
+    return (
+      <Badge variant="destructive" className="gap-1 text-[10px]">
+        <AlertTriangle className="size-2.5" />
+        {summary.error_count} errors
+      </Badge>
+    );
+  }
+
+  if (summary.success_count > 0) {
+    return <Badge variant="secondary" className="text-[10px]">{summary.success_count} hits</Badge>;
+  }
+
+  if (summary.not_configured_count === summary.adapter_count && summary.adapter_count > 0) {
+    return <Badge variant="outline" className="text-[10px]">needs config</Badge>;
+  }
+
+  return <Badge variant="outline" className="text-[10px]">no hits</Badge>;
 }
 
 function parseSeedLines(seedLines: string): ScoutSeedTarget[] {

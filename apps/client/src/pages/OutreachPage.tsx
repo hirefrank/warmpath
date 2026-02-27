@@ -2,12 +2,19 @@ import { useEffect, useState } from "react";
 import { JobPicker } from "../components/outreach/JobPicker";
 import { ContactsImportPanel } from "../components/outreach/ContactsImportPanel";
 import { ScoutPanel } from "../components/outreach/ScoutPanel";
+import { BuildPathPanel, type BuildPathCandidate } from "../components/outreach/BuildPathPanel";
 import { RankedPathsList } from "../components/outreach/RankedPathsList";
 import { IntroDraftPanel } from "../components/outreach/IntroDraftPanel";
 import { AppLayout } from "../components/layout/AppLayout";
 import type { WorkflowStep } from "../components/layout/AppSidebar";
 import {
+  autoTuneLearning,
+  generateDistributionPack,
+  getLearningSummary,
+  generateMessagePack,
+  generateOutreachBrief,
   draftIntro,
+  getWorkflowSnapshot,
   getScoutStats,
   getScoutRun,
   importContactsFromCsv,
@@ -15,8 +22,12 @@ import {
   listJobs,
   listScoutRuns,
   rankWarmPaths,
+  recordLearningFeedback,
   runSecondDegreeScout,
+  scheduleReminder,
   syncJobs,
+  trackWorkflowStatus,
+  updateReminder,
 } from "../lib/api";
 import type { NormalizedJob } from "@warmpath/shared/contracts/job";
 import type {
@@ -25,7 +36,17 @@ import type {
   SecondDegreeScoutRequest,
   SecondDegreeScoutRun,
 } from "@warmpath/shared/contracts/scout";
-import type { IntroDraftResponse, RankedPath } from "@warmpath/shared/contracts/warm-path";
+import type {
+  DistributionPackResponse,
+  IntroDraftResponse,
+  LearningSummaryResponse,
+  MessageChannel,
+  MessagePackResponse,
+  OutreachWorkflowStatus,
+  OutreachBriefResponse,
+  RankedPath,
+  WorkflowSnapshotResponse,
+} from "@warmpath/shared/contracts/warm-path";
 
 export function OutreachPage() {
   const [activeStep, setActiveStep] = useState<WorkflowStep>("scout");
@@ -33,6 +54,9 @@ export function OutreachPage() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [paths, setPaths] = useState<RankedPath[]>([]);
   const [selectedColleagueId, setSelectedColleagueId] = useState<string | null>(null);
+  const [brief, setBrief] = useState<OutreachBriefResponse | null>(null);
+  const [messagePack, setMessagePack] = useState<MessagePackResponse | null>(null);
+  const [distributionPack, setDistributionPack] = useState<DistributionPackResponse | null>(null);
   const [draft, setDraft] = useState<IntroDraftResponse | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const [contactCount, setContactCount] = useState(0);
@@ -41,10 +65,25 @@ export function OutreachPage() {
   const [scoutStats, setScoutStats] = useState<ScoutRunStats | null>(null);
   const [scoutNotes, setScoutNotes] = useState<string | null>(null);
   const [scoutDiagnostics, setScoutDiagnostics] = useState<ScoutRunDiagnostics | null>(null);
+  const [pendingBuildPathCandidate, setPendingBuildPathCandidate] = useState<BuildPathCandidate | null>(null);
+  const [buildPathHint, setBuildPathHint] = useState<string | null>(null);
+  const [draftExtraContext, setDraftExtraContext] = useState("");
+  const [draftContextHint, setDraftContextHint] = useState<string | null>(null);
+  const [draftContextSource, setDraftContextSource] = useState<"build_path" | null>(null);
+  const [draftAppliedContext, setDraftAppliedContext] = useState<string | null>(null);
+  const [draftAppliedContextSource, setDraftAppliedContextSource] = useState<"build_path" | "manual" | null>(null);
+  const [workflowSnapshot, setWorkflowSnapshot] = useState<WorkflowSnapshotResponse | null>(null);
+  const [learningSummary, setLearningSummary] = useState<LearningSummaryResponse | null>(null);
+  const [draftTone, setDraftTone] = useState<"warm" | "concise" | "direct">("warm");
   const [isSyncing, setIsSyncing] = useState(false);
   const [isImportingContacts, setIsImportingContacts] = useState(false);
   const [isScouting, setIsScouting] = useState(false);
   const [isRanking, setIsRanking] = useState(false);
+  const [isGeneratingBrief, setIsGeneratingBrief] = useState(false);
+  const [isGeneratingMessagePack, setIsGeneratingMessagePack] = useState(false);
+  const [isGeneratingDistributionPack, setIsGeneratingDistributionPack] = useState(false);
+  const [isUpdatingWorkflow, setIsUpdatingWorkflow] = useState(false);
+  const [isUpdatingLearning, setIsUpdatingLearning] = useState(false);
   const [isDrafting, setIsDrafting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,6 +92,7 @@ export function OutreachPage() {
     void refreshContacts();
     void refreshScoutRuns();
     void refreshScoutStats();
+    void refreshLearningSummary();
   }, []);
 
   async function refreshJobs(): Promise<void> {
@@ -91,6 +131,15 @@ export function OutreachPage() {
     }
   }
 
+  async function refreshLearningSummary(): Promise<void> {
+    try {
+      const summary = await getLearningSummary();
+      setLearningSummary(summary);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function handleSync(): Promise<void> {
     setError(null);
     setIsSyncing(true);
@@ -104,7 +153,7 @@ export function OutreachPage() {
     }
   }
 
-  async function handleRank(): Promise<void> {
+  async function handleRank(candidateOverride?: BuildPathCandidate): Promise<void> {
     if (!selectedJobId) return;
     setError(null);
     setIsRanking(true);
@@ -115,8 +164,69 @@ export function OutreachPage() {
       });
       setRunId(result.run_id);
       setPaths(result.top_paths);
-      setSelectedColleagueId(result.top_paths[0]?.colleague_id ?? null);
+      const weightProfile = result.weight_profile;
+      if (weightProfile) {
+        setLearningSummary((current) => {
+          if (!current) {
+            return {
+              active_profile: weightProfile,
+              totals: {
+                feedback_count: 0,
+                successful_outcomes: 0,
+                recent_feedback_count: 0,
+              },
+              recent_feedback: [],
+            };
+          }
+
+          return {
+            ...current,
+            active_profile: weightProfile,
+          };
+        });
+      }
+
+      const activeBuildPathCandidate = candidateOverride ?? pendingBuildPathCandidate;
+      const preferredContactId = activeBuildPathCandidate?.connectorContactId;
+      let selectedId = result.top_paths[0]?.colleague_id ?? null;
+
+      if (preferredContactId) {
+        const matchedPath = result.top_paths.find((path) => path.colleague_id === preferredContactId);
+        if (matchedPath) {
+          selectedId = matchedPath.colleague_id;
+          setBuildPathHint(
+            `Build Path preselected ${matchedPath.name} for ${activeBuildPathCandidate?.fullName ?? "your candidate"}.`
+          );
+          setDraftContextHint(
+            `Prefilled from Build Path candidate ${activeBuildPathCandidate?.fullName ?? "target"} via ${activeBuildPathCandidate?.connectorName ?? "connector"}.`
+          );
+          setDraftContextSource("build_path");
+        } else {
+          setBuildPathHint(
+            `Build Path suggestion ${activeBuildPathCandidate?.connectorName ?? "connector"} was not present in ranked paths. Review top matches.`
+          );
+          setDraftContextHint(
+            `Build Path context retained for ${activeBuildPathCandidate?.fullName ?? "selected candidate"}.`
+          );
+          setDraftContextSource("build_path");
+        }
+      } else if (activeBuildPathCandidate) {
+        setBuildPathHint(
+          `Build Path candidate ${activeBuildPathCandidate.fullName} has no linked contact id. Review ranked paths manually.`
+        );
+        setDraftContextHint(
+          `Build Path context retained for ${activeBuildPathCandidate.fullName}.`
+        );
+        setDraftContextSource("build_path");
+      }
+
+      setSelectedColleagueId(selectedId);
+      setPendingBuildPathCandidate(null);
+      setBrief(null);
+      setMessagePack(null);
+      setDistributionPack(null);
       setDraft(null);
+      setWorkflowSnapshot(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -158,8 +268,9 @@ export function OutreachPage() {
   async function handleSelectScoutRun(runIdValue: string): Promise<void> {
     setError(null);
     try {
-      const run = await getScoutRun(runIdValue);
-      setSelectedScoutRun(run);
+      const result = await getScoutRun(runIdValue);
+      setSelectedScoutRun(result.run);
+      setScoutDiagnostics(result.diagnostics ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -170,13 +281,269 @@ export function OutreachPage() {
     setError(null);
     setIsDrafting(true);
     try {
-      const result = await draftIntro({ run_id: runId, colleague_id: selectedColleagueId });
+      const trimmedContext = draftExtraContext.trim();
+      const result = await draftIntro({
+        run_id: runId,
+        colleague_id: selectedColleagueId,
+        extra_context: trimmedContext || undefined,
+        tone: draftTone,
+      });
       setDraft(result);
+      setBrief(result.brief ?? null);
+      setMessagePack(result.message_pack ?? null);
+      setDistributionPack(null);
+      const appliedContext = result.applied_context ?? (trimmedContext || null);
+      setDraftAppliedContext(appliedContext);
+      setDraftAppliedContextSource(appliedContext ? (draftContextSource ?? "manual") : null);
+      const workflow = await getWorkflowSnapshot({ run_id: runId, colleague_id: selectedColleagueId });
+      setWorkflowSnapshot(workflow);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsDrafting(false);
     }
+  }
+
+  async function handleGenerateBrief(): Promise<void> {
+    if (!runId || !selectedColleagueId) return;
+    setError(null);
+    setIsGeneratingBrief(true);
+    try {
+      const trimmedContext = draftExtraContext.trim();
+      const result = await generateOutreachBrief({
+        run_id: runId,
+        colleague_id: selectedColleagueId,
+        extra_context: trimmedContext || undefined,
+        tone: draftTone,
+      });
+      setBrief(result);
+      setMessagePack(null);
+      setDistributionPack(null);
+      setDraftAppliedContext(result.applied_context ?? (trimmedContext || null));
+      setDraftAppliedContextSource(result.applied_context || trimmedContext ? (draftContextSource ?? "manual") : null);
+      const workflow = await getWorkflowSnapshot({ run_id: runId, colleague_id: selectedColleagueId });
+      setWorkflowSnapshot(workflow);
+      setActiveStep("draft");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsGeneratingBrief(false);
+    }
+  }
+
+  async function handleGenerateMessagePack(): Promise<void> {
+    if (!runId || !selectedColleagueId) return;
+    setError(null);
+    setIsGeneratingMessagePack(true);
+    try {
+      const trimmedContext = draftExtraContext.trim();
+      const result = await generateMessagePack({
+        run_id: runId,
+        colleague_id: selectedColleagueId,
+        extra_context: trimmedContext || undefined,
+        tone: draftTone,
+      });
+      setMessagePack(result);
+      setBrief(result.brief);
+      setDistributionPack(null);
+      setDraftAppliedContext(result.applied_context ?? (trimmedContext || null));
+      setDraftAppliedContextSource(result.applied_context || trimmedContext ? (draftContextSource ?? "manual") : null);
+      const workflow = await getWorkflowSnapshot({ run_id: runId, colleague_id: selectedColleagueId });
+      setWorkflowSnapshot(workflow);
+      setActiveStep("draft");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsGeneratingMessagePack(false);
+    }
+  }
+
+  async function handleGenerateDistributionPack(): Promise<void> {
+    if (!runId || !selectedColleagueId) return;
+    setError(null);
+    setIsGeneratingDistributionPack(true);
+    try {
+      const trimmedContext = draftExtraContext.trim();
+      const result = await generateDistributionPack({
+        run_id: runId,
+        colleague_id: selectedColleagueId,
+        extra_context: trimmedContext || undefined,
+        tone: draftTone,
+      });
+      setDistributionPack(result);
+      const workflow = await getWorkflowSnapshot({ run_id: runId, colleague_id: selectedColleagueId });
+      setWorkflowSnapshot(workflow);
+      setActiveStep("draft");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsGeneratingDistributionPack(false);
+    }
+  }
+
+  async function handleTrackWorkflowStatus(
+    status: OutreachWorkflowStatus,
+    channel?: MessageChannel
+  ): Promise<void> {
+    if (!runId || !selectedColleagueId) return;
+    setError(null);
+    setIsUpdatingWorkflow(true);
+    try {
+      const result = await trackWorkflowStatus({
+        run_id: runId,
+        colleague_id: selectedColleagueId,
+        status,
+        channel,
+      });
+      setWorkflowSnapshot(result.snapshot);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsUpdatingWorkflow(false);
+    }
+  }
+
+  async function handleScheduleReminder(
+    message: string,
+    offsetDays: number,
+    channel: MessageChannel
+  ): Promise<void> {
+    if (!runId || !selectedColleagueId) return;
+    setError(null);
+    setIsUpdatingWorkflow(true);
+    try {
+      const result = await scheduleReminder({
+        run_id: runId,
+        colleague_id: selectedColleagueId,
+        message,
+        offset_days: offsetDays,
+        channel,
+      });
+      setWorkflowSnapshot(result.snapshot);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsUpdatingWorkflow(false);
+    }
+  }
+
+  async function handleUpdateReminder(
+    reminderId: string,
+    status: "pending" | "completed" | "cancelled"
+  ): Promise<void> {
+    if (!runId) return;
+    setError(null);
+    setIsUpdatingWorkflow(true);
+    try {
+      const result = await updateReminder({
+        run_id: runId,
+        reminder_id: reminderId,
+        status,
+      });
+      setWorkflowSnapshot(result.snapshot);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsUpdatingWorkflow(false);
+    }
+  }
+
+  async function handleRecordLearning(outcome: "intro_accepted" | "replied" | "not_interested" | "no_response"): Promise<void> {
+    if (!runId || !selectedColleagueId) return;
+    setError(null);
+    setIsUpdatingLearning(true);
+    try {
+      const result = await recordLearningFeedback({
+        run_id: runId,
+        colleague_id: selectedColleagueId,
+        outcome,
+      });
+      setLearningSummary(result.summary);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsUpdatingLearning(false);
+    }
+  }
+
+  async function handleAutoTuneLearning(): Promise<void> {
+    setError(null);
+    setIsUpdatingLearning(true);
+    try {
+      await autoTuneLearning(5);
+      await refreshLearningSummary();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsUpdatingLearning(false);
+    }
+  }
+
+  function applyBuildPathCandidateContext(candidate: BuildPathCandidate): void {
+    setPendingBuildPathCandidate(candidate);
+    setDraftExtraContext(
+      [
+        `Build Path target: ${candidate.fullName} (${candidate.title} @ ${candidate.company}).`,
+        `Preferred connector: ${candidate.connectorName}.`,
+        `Suggested ask: ${candidate.recommendedAsk}.`,
+        `Path score: ${candidate.pathScore}; connector strength: ${Math.round(candidate.connectorStrength * 100)}%; target confidence: ${Math.round(candidate.confidence * 100)}%.`,
+      ].join(" ")
+    );
+    setDraftContextHint(
+      `Prefilled from Build Path candidate ${candidate.fullName} with connector ${candidate.connectorName}.`
+    );
+    setDraftContextSource("build_path");
+  }
+
+  function handleUseBuildPathCandidate(candidate: BuildPathCandidate): void {
+    applyBuildPathCandidateContext(candidate);
+
+    if (!selectedJobId) {
+      setBuildPathHint(
+        `Build Path selected ${candidate.connectorName} -> ${candidate.fullName}. Pick a job next, then run Rank.`
+      );
+      setActiveStep("jobs");
+      return;
+    }
+
+    setBuildPathHint(
+      `Build Path selected ${candidate.connectorName} -> ${candidate.fullName}. Run Rank to apply this connector preference.`
+    );
+    setActiveStep("rank");
+  }
+
+  async function handleUseBuildPathCandidateAndRank(candidate: BuildPathCandidate): Promise<void> {
+    applyBuildPathCandidateContext(candidate);
+
+    if (!selectedJobId) {
+      setBuildPathHint(
+        `Build Path selected ${candidate.connectorName} -> ${candidate.fullName}. Pick a job next, then rank.`
+      );
+      setActiveStep("jobs");
+      return;
+    }
+
+    setBuildPathHint(
+      `Build Path selected ${candidate.connectorName} -> ${candidate.fullName}. Ranking now with this connector preference.`
+    );
+    setActiveStep("rank");
+    await handleRank(candidate);
+  }
+
+  function handleOpenRankFromBuildPath(): void {
+    if (!selectedJobId) {
+      setBuildPathHint("Select a job before ranking Build Path candidates.");
+      setActiveStep("jobs");
+      return;
+    }
+
+    setActiveStep("rank");
+  }
+
+  function handleResetDraftContext(): void {
+    setDraftExtraContext("");
+    setDraftContextHint(null);
+    setDraftContextSource(null);
   }
 
   return (
@@ -185,12 +552,21 @@ export function OutreachPage() {
       onStepChange={setActiveStep}
       contactCount={contactCount}
       jobCount={jobs.length}
+      buildPathCount={selectedScoutRun?.connector_paths.length ?? 0}
       pathCount={paths.length}
-      hasDraft={draft !== null}
+      hasDraft={draft !== null || brief !== null || messagePack !== null || distributionPack !== null}
     >
       {error ? (
-        <div className="mb-4 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive animate-fade-in-up" role="alert">
+          <div className="mt-0.5 size-1.5 shrink-0 rounded-full bg-destructive" />
           {error}
+        </div>
+      ) : null}
+
+      {buildPathHint ? (
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-foreground animate-fade-in-up">
+          <div className="mt-0.5 size-1.5 shrink-0 rounded-full bg-primary" />
+          {buildPathHint}
         </div>
       ) : null}
 
@@ -227,17 +603,67 @@ export function OutreachPage() {
         />
       )}
 
+      {activeStep === "buildPath" && (
+        <BuildPathPanel
+          runs={scoutRuns}
+          selectedRun={selectedScoutRun}
+          isRanking={isRanking}
+          onSelectRun={handleSelectScoutRun}
+          onOpenScoutStep={() => setActiveStep("scout")}
+          onOpenRankStep={handleOpenRankFromBuildPath}
+          onUseCandidate={handleUseBuildPathCandidate}
+          onUseCandidateAndRank={handleUseBuildPathCandidateAndRank}
+        />
+      )}
+
       {activeStep === "rank" && (
         <RankedPathsList
           paths={paths}
           selectedColleagueId={selectedColleagueId}
           onSelectColleague={setSelectedColleagueId}
+          draftContext={draftExtraContext}
+          draftContextHint={draftContextHint}
+          draftContextSource={draftContextSource}
+          onDraftContextChange={(value) => {
+            setDraftExtraContext(value);
+            if (draftContextHint && value.trim().length === 0) {
+              setDraftContextHint(null);
+              setDraftContextSource(null);
+            }
+          }}
+          onResetDraftContext={handleResetDraftContext}
+          draftTone={draftTone}
+          onDraftToneChange={setDraftTone}
+          onGenerateBrief={handleGenerateBrief}
+          isGeneratingBrief={isGeneratingBrief}
+          onGenerateMessagePack={handleGenerateMessagePack}
+          isGeneratingMessagePack={isGeneratingMessagePack}
+          onGenerateDistributionPack={handleGenerateDistributionPack}
+          isGeneratingDistributionPack={isGeneratingDistributionPack}
           onDraft={handleDraft}
           isDrafting={isDrafting}
         />
       )}
 
-      {activeStep === "draft" && <IntroDraftPanel draft={draft} />}
+      {activeStep === "draft" && (
+        <IntroDraftPanel
+          draft={draft}
+          brief={brief}
+          messagePack={messagePack}
+          distributionPack={distributionPack}
+          workflow={workflowSnapshot}
+          isUpdatingWorkflow={isUpdatingWorkflow}
+          onTrackStatus={handleTrackWorkflowStatus}
+          onScheduleReminder={handleScheduleReminder}
+          onUpdateReminder={handleUpdateReminder}
+          learningSummary={learningSummary}
+          isUpdatingLearning={isUpdatingLearning}
+          onRecordLearning={handleRecordLearning}
+          onAutoTune={handleAutoTuneLearning}
+          context={draftAppliedContext}
+          contextSource={draftAppliedContextSource}
+        />
+      )}
     </AppLayout>
   );
 }
