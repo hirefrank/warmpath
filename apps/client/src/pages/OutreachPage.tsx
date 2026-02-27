@@ -115,7 +115,8 @@ export function OutreachPage() {
 
   async function refreshJobs(advisorSlug: string = settings?.settings.advisor_slug ?? "hirefrank"): Promise<void> {
     try {
-      const result = await listJobs({ advisor_slug: advisorSlug, limit: 200 });
+      const limit = settings?.settings.default_list_limit ?? 1000;
+      const result = await listJobs({ advisor_slug: advisorSlug, limit });
       setJobs(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

@@ -230,6 +230,9 @@ export function IntroDraftPanel(props: IntroDraftPanelProps) {
               <Badge variant="secondary" className="text-[10px]">{props.workflow.latest_status}</Badge>
             ) : null}
           </SectionHeader>
+          <p className="text-xs text-muted-foreground">
+            Track where you are in the outreach process.
+          </p>
 
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="secondary" disabled={props.isUpdatingWorkflow} onClick={() => void props.onTrackStatus("sent", "email")} className="gap-1 text-xs">
@@ -347,13 +350,16 @@ export function IntroDraftPanel(props: IntroDraftPanelProps) {
           ) : null}
         </div>
 
-        {/* Learning Loop */}
+        {/* Record Outcome */}
         <div className="space-y-3 rounded-lg border bg-accent/20 p-4 animate-fade-in-up stagger-4">
-          <SectionHeader icon={BrainCircuit} title="Learning Loop">
+          <SectionHeader icon={BrainCircuit} title="Record Outcome">
             {props.learningSummary?.active_profile ? (
               <Badge variant="outline" className="text-[10px]">{props.learningSummary.active_profile.source}</Badge>
             ) : null}
           </SectionHeader>
+          <p className="text-xs text-muted-foreground">
+            After you reach out, record what happened so WarmPath can improve future recommendations.
+          </p>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="secondary" disabled={props.isUpdatingLearning} onClick={() => void props.onRecordLearning("intro_accepted")} className="text-xs">
               Intro Accepted
@@ -370,7 +376,7 @@ export function IntroDraftPanel(props: IntroDraftPanelProps) {
           </div>
           <Button size="sm" disabled={props.isUpdatingLearning} onClick={() => void props.onAutoTune()} className="gap-1.5 text-xs">
             <BrainCircuit className="size-3" />
-            Auto-Tune Weights
+            Improve Recommendations
           </Button>
           {props.learningSummary ? (
             <div className="flex flex-wrap gap-2 rounded-lg bg-card p-3">
@@ -379,11 +385,11 @@ export function IntroDraftPanel(props: IntroDraftPanelProps) {
               </div>
               {(["company_affinity", "role_relevance", "relationship_strength", "shared_context", "confidence"] as const).map((key) => {
                 const labels: Record<string, string> = {
-                  company_affinity: "Company",
-                  role_relevance: "Role",
-                  relationship_strength: "Rel",
-                  shared_context: "Context",
-                  confidence: "Conf",
+                  company_affinity: "Company Match",
+                  role_relevance: "Role Fit",
+                  relationship_strength: "Relationship",
+                  shared_context: "Shared Context",
+                  confidence: "Confidence",
                 };
                 return (
                   <div key={key} className="flex items-center gap-1 rounded bg-accent/50 px-2 py-1">

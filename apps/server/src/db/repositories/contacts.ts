@@ -78,7 +78,7 @@ export function upsertContacts(database: Database, contacts: ContactInput[]): nu
   return contacts.length;
 }
 
-export function listContacts(database: Database, limit: number = 200): ContactRecord[] {
+export function listContacts(database: Database, limit: number = 1000): ContactRecord[] {
   const safeLimit = Math.max(1, Math.floor(limit));
   const rows = (database.query<ContactRecord, []>(
     `

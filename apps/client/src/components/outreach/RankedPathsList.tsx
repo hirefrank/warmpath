@@ -149,7 +149,7 @@ export function RankedPathsList(props: RankedPathsListProps) {
             <Textarea
               id="draft-context"
               rows={3}
-              placeholder="Anything a connector should know before introducing you..."
+              placeholder="e.g. I'm especially interested in their ML platform team, and I've built similar systems at my current company."
               value={props.draftContext}
               onChange={(event) => props.onDraftContextChange(event.currentTarget.value)}
               className="text-sm"
@@ -170,9 +170,9 @@ export function RankedPathsList(props: RankedPathsListProps) {
                   }
                 }}
               >
-                <option value="warm">Warm</option>
-                <option value="concise">Concise</option>
-                <option value="direct">Direct</option>
+                <option value="warm">Warm &mdash; friendly and personal</option>
+                <option value="concise">Concise &mdash; short and to the point</option>
+                <option value="direct">Direct &mdash; professional and straightforward</option>
               </Select>
             </div>
           </div>

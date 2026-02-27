@@ -113,7 +113,7 @@ export function listJobs(database: Database, filters: JobFilters): NormalizedJob
   }
 
   const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
-  const limit = Number.isFinite(filters.limit) ? Math.max(1, Math.floor(filters.limit ?? 200)) : 200;
+  const limit = Number.isFinite(filters.limit) ? Math.max(1, Math.floor(filters.limit ?? 1000)) : 1000;
 
   const statement = database.query<JobRow, []>(
     `
@@ -121,7 +121,7 @@ export function listJobs(database: Database, filters: JobFilters): NormalizedJob
            category, location, url, salary_min, salary_max, posted_at, first_seen, last_seen, cached_at
     FROM jobs_cache
     ${where}
-    ORDER BY COALESCE(posted_at, first_seen, cached_at) DESC
+    ORDER BY company ASC, title ASC
     LIMIT ${limit}
     `
   ) as any;

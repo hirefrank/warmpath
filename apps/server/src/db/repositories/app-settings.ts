@@ -12,6 +12,7 @@ interface SettingRow {
 const DEFAULTS = {
   advisor_slug: "hirefrank",
   default_job_category: "product",
+  default_list_limit: 1000,
   linkedin_rate_limit_ms: 1200,
   linkedin_request_timeout_ms: 15000,
   scout_min_target_confidence: 0.45,
@@ -33,6 +34,7 @@ export function getWarmPathSettings(database: Database): WarmPathSettingsRespons
   const settings: WarmPathSettings = {
     advisor_slug: normalizeString(raw.advisor_slug, DEFAULTS.advisor_slug),
     default_job_category: normalizeString(raw.default_job_category, DEFAULTS.default_job_category),
+    default_list_limit: parseNumber(raw.default_list_limit, NaN, DEFAULTS.default_list_limit, 1, 10000),
     linkedin_li_at: resolveLinkedInCookie(raw.linkedin_li_at),
     linkedin_rate_limit_ms: parseNumber(
       raw.linkedin_rate_limit_ms,
@@ -79,6 +81,9 @@ export function updateWarmPathSettings(
   }
   if (patch.default_job_category !== undefined) {
     pairs.push({ key: "default_job_category", value: normalizeStoredString(patch.default_job_category) });
+  }
+  if (patch.default_list_limit !== undefined) {
+    pairs.push({ key: "default_list_limit", value: Number(patch.default_list_limit).toString() });
   }
   if (patch.linkedin_li_at !== undefined) {
     pairs.push({ key: "linkedin_li_at", value: normalizeStoredString(patch.linkedin_li_at) });

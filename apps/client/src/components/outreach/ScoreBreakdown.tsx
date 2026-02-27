@@ -12,11 +12,11 @@ const dimensions: {
   barClass: string;
   dotClass: string;
 }[] = [
-  { key: "company_affinity", label: "Company Affinity", barClass: "bg-[oklch(0.62_0.15_50)]", dotClass: "bg-[oklch(0.62_0.15_50)]" },
-  { key: "role_relevance", label: "Role Relevance", barClass: "bg-[oklch(0.65_0.13_160)]", dotClass: "bg-[oklch(0.65_0.13_160)]" },
+  { key: "company_affinity", label: "Company Match", barClass: "bg-[oklch(0.62_0.15_50)]", dotClass: "bg-[oklch(0.62_0.15_50)]" },
+  { key: "role_relevance", label: "Role Fit", barClass: "bg-[oklch(0.65_0.13_160)]", dotClass: "bg-[oklch(0.65_0.13_160)]" },
   { key: "relationship_strength", label: "Relationship Strength", barClass: "bg-[oklch(0.58_0.16_300)]", dotClass: "bg-[oklch(0.58_0.16_300)]" },
   { key: "shared_context", label: "Shared Context", barClass: "bg-[oklch(0.72_0.14_70)]", dotClass: "bg-[oklch(0.72_0.14_70)]" },
-  { key: "confidence", label: "Confidence", barClass: "bg-[oklch(0.62_0.14_20)]", dotClass: "bg-[oklch(0.62_0.14_20)]" },
+  { key: "confidence", label: "Data Confidence", barClass: "bg-[oklch(0.62_0.14_20)]", dotClass: "bg-[oklch(0.62_0.14_20)]" },
 ];
 
 export function ScoreBreakdown(props: ScoreBreakdownProps) {

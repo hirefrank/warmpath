@@ -80,9 +80,9 @@ export function BuildPathPanel(props: BuildPathPanelProps) {
               <GitBranch className="size-4 text-primary" />
             </div>
             <div>
-              <CardTitle>Build a Path Lane</CardTitle>
+              <CardTitle>Choose Outreach Targets</CardTitle>
               <CardDescription>
-                Promote viable 2nd-degree targets into actionable outreach paths.
+                Pick the strongest target + connector pairings from your scout results.
               </CardDescription>
             </div>
           </div>
@@ -163,10 +163,13 @@ export function BuildPathPanel(props: BuildPathPanelProps) {
                 onChange={(event) => setAskFilter(event.currentTarget.value as AskFilter)}
               >
                 <option value="all">All asks</option>
-                <option value="context">Context</option>
-                <option value="intro">Intro</option>
-                <option value="referral">Referral</option>
+                <option value="context">Context &mdash; background info</option>
+                <option value="intro">Intro &mdash; personal introduction</option>
+                <option value="referral">Referral &mdash; job referral</option>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Context = background info, Intro = personal introduction, Referral = job referral
+              </p>
             </div>
 
             <div className="space-y-2">

@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Settings2, KeyRound } from "lucide-react";
+import { Settings2, KeyRound, ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface SettingsPanelProps {
   settings: WarmPathSettings | null;
@@ -26,7 +26,10 @@ export function SettingsPanel(props: SettingsPanelProps) {
   const [minConfidence, setMinConfidence] = useState("0.45");
   const [rateLimitMs, setRateLimitMs] = useState("1200");
   const [requestTimeoutMs, setRequestTimeoutMs] = useState("15000");
+  const [listLimit, setListLimit] = useState("1000");
   const [staticTargetsJson, setStaticTargetsJson] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showCookieHelp, setShowCookieHelp] = useState(false);
 
   useEffect(() => {
     if (!props.settings) {
@@ -36,6 +39,7 @@ export function SettingsPanel(props: SettingsPanelProps) {
     setAdvisorSlug(props.settings.advisor_slug);
     setDefaultCategory(props.settings.default_job_category);
     setLinkedinLiAt(props.settings.linkedin_li_at);
+    setListLimit(String(props.settings.default_list_limit));
     setProviderOrder(props.settings.scout_provider_order);
     setMinConfidence(String(props.settings.scout_min_target_confidence));
     setRateLimitMs(String(props.settings.linkedin_rate_limit_ms));
@@ -47,6 +51,7 @@ export function SettingsPanel(props: SettingsPanelProps) {
     await props.onSave({
       advisor_slug: advisorSlug,
       default_job_category: defaultCategory,
+      default_list_limit: Number(listLimit),
       linkedin_li_at: linkedinLiAt,
       scout_provider_order: providerOrder,
       scout_min_target_confidence: Number(minConfidence),
@@ -59,40 +64,33 @@ export function SettingsPanel(props: SettingsPanelProps) {
   return (
     <Card className="animate-fade-in-up overflow-hidden">
       <CardHeader className="border-b border-border/50 bg-accent/30">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
-              <Settings2 className="size-4 text-primary" />
-            </div>
-            <div>
-              <CardTitle>Settings</CardTitle>
-              <CardDescription>
-                Set this up once in plain English style, then run your workflow without touching `.env` files.
-              </CardDescription>
-            </div>
+        <div className="flex items-center gap-2.5">
+          <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+            <Settings2 className="size-4 text-primary" />
           </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={props.hints?.linkedin_configured ? "secondary" : "outline"}>
-              LinkedIn {props.hints?.linkedin_configured ? "Ready" : "Missing"}
-            </Badge>
-            <Badge variant={props.hints?.static_seed_configured ? "secondary" : "outline"}>
-              Static Seed {props.hints?.static_seed_configured ? "Ready" : "Empty"}
-            </Badge>
+          <div>
+            <CardTitle>Settings</CardTitle>
+            <CardDescription>
+              Configure your profile and LinkedIn connection. You only need to do this once.
+            </CardDescription>
           </div>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-5 pt-5">
+        {/* Basics */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="settings-advisor-slug">Advisor slug</Label>
+            <Label htmlFor="settings-advisor-slug">Your profile name</Label>
             <Input
               id="settings-advisor-slug"
               value={advisorSlug}
               onChange={(event) => setAdvisorSlug(event.currentTarget.value)}
               placeholder="hirefrank"
             />
+            <p className="text-xs text-muted-foreground">
+              A short identifier for your profile, like a username.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="settings-default-category">Default job category</Label>
@@ -102,12 +100,15 @@ export function SettingsPanel(props: SettingsPanelProps) {
               onChange={(event) => setDefaultCategory(event.currentTarget.value)}
               placeholder="product"
             />
+            <p className="text-xs text-muted-foreground">
+              e.g. product, engineering, design, marketing
+            </p>
           </div>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="settings-li-at" className="flex items-center gap-2">
-            <KeyRound className="size-3.5" /> LinkedIn `li_at` cookie
+            <KeyRound className="size-3.5" /> LinkedIn session cookie
           </Label>
           <Textarea
             id="settings-li-at"
@@ -119,66 +120,118 @@ export function SettingsPanel(props: SettingsPanelProps) {
           <p className="text-xs text-muted-foreground">
             Keep this private. It is stored locally in your SQLite database.
           </p>
+          <button
+            type="button"
+            onClick={() => setShowCookieHelp(!showCookieHelp)}
+            className="text-xs font-medium text-primary hover:underline"
+          >
+            {showCookieHelp ? "Hide instructions" : "How do I find this?"}
+          </button>
+          {showCookieHelp && (
+            <div className="rounded-lg border bg-accent/30 p-3 text-xs text-muted-foreground space-y-1">
+              <p>1. Open LinkedIn in Chrome and sign in.</p>
+              <p>2. Open DevTools (F12 or Cmd+Opt+I).</p>
+              <p>3. Go to <strong>Application</strong> &rarr; <strong>Cookies</strong> &rarr; <strong>linkedin.com</strong>.</p>
+              <p>4. Find the cookie named <code>li_at</code> and copy its value.</p>
+              <p>5. Paste it in the field above.</p>
+            </div>
+          )}
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="settings-rate-limit">LinkedIn delay (ms)</Label>
-            <Input
-              id="settings-rate-limit"
-              type="number"
-              min={100}
-              value={rateLimitMs}
-              onChange={(event) => setRateLimitMs(event.currentTarget.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="settings-timeout">LinkedIn timeout (ms)</Label>
-            <Input
-              id="settings-timeout"
-              type="number"
-              min={1000}
-              value={requestTimeoutMs}
-              onChange={(event) => setRequestTimeoutMs(event.currentTarget.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="settings-min-confidence">Scout min confidence</Label>
-            <Input
-              id="settings-min-confidence"
-              type="number"
-              min={0}
-              max={1}
-              step="0.01"
-              value={minConfidence}
-              onChange={(event) => setMinConfidence(event.currentTarget.value)}
-            />
-          </div>
-        </div>
+        {/* Advanced section */}
+        <button
+          type="button"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="flex w-full items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ChevronDown className={cn("size-4 transition-transform", showAdvanced && "rotate-180")} />
+          Advanced settings
+        </button>
 
-        <div className="space-y-2">
-          <Label htmlFor="settings-provider-order">Scout provider order</Label>
-          <Input
-            id="settings-provider-order"
-            value={providerOrder}
-            onChange={(event) => setProviderOrder(event.currentTarget.value)}
-            placeholder="linkedin_li_at,static_seed"
-          />
-          <p className="text-xs text-muted-foreground">
-            Supported values: `linkedin_li_at`, `static_seed` (comma-separated).
-          </p>
-        </div>
+        {showAdvanced && (
+          <div className="space-y-4 rounded-lg border bg-accent/10 p-4 animate-fade-in-up">
+            <div className="space-y-2">
+              <Label htmlFor="settings-list-limit">Results per page</Label>
+              <Input
+                id="settings-list-limit"
+                type="number"
+                min={1}
+                max={10000}
+                value={listLimit}
+                onChange={(event) => setListLimit(event.currentTarget.value)}
+                className="w-28"
+              />
+              <p className="text-xs text-muted-foreground">
+                Max jobs and contacts to load at once (default 1000)
+              </p>
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="settings-static-targets">Static scout targets JSON (optional)</Label>
-          <Textarea
-            id="settings-static-targets"
-            rows={6}
-            value={staticTargetsJson}
-            onChange={(event) => setStaticTargetsJson(event.currentTarget.value)}
-            placeholder='[{"full_name":"Taylor Candidate","current_company":"Acme","current_title":"Senior Product Manager","confidence":0.82}]'
-          />
-        </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="settings-rate-limit">LinkedIn request delay</Label>
+                <Input
+                  id="settings-rate-limit"
+                  type="number"
+                  min={100}
+                  value={rateLimitMs}
+                  onChange={(event) => setRateLimitMs(event.currentTarget.value)}
+                />
+                <p className="text-xs text-muted-foreground">Milliseconds between requests</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="settings-timeout">LinkedIn request timeout</Label>
+                <Input
+                  id="settings-timeout"
+                  type="number"
+                  min={1000}
+                  value={requestTimeoutMs}
+                  onChange={(event) => setRequestTimeoutMs(event.currentTarget.value)}
+                />
+                <p className="text-xs text-muted-foreground">Milliseconds before giving up</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="settings-min-confidence">Minimum match confidence</Label>
+                <Input
+                  id="settings-min-confidence"
+                  type="number"
+                  min={0}
+                  max={1}
+                  step="0.01"
+                  value={minConfidence}
+                  onChange={(event) => setMinConfidence(event.currentTarget.value)}
+                />
+                <p className="text-xs text-muted-foreground">0.0&ndash;1.0, higher = stricter</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="settings-provider-order">Scout provider order</Label>
+              <Input
+                id="settings-provider-order"
+                value={providerOrder}
+                onChange={(event) => setProviderOrder(event.currentTarget.value)}
+                placeholder="linkedin_li_at,static_seed"
+              />
+              <p className="text-xs text-muted-foreground">
+                Which sources to try, in order. Options: linkedin_li_at (live LinkedIn), static_seed (manual targets).
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="settings-static-targets">Seed targets (optional)</Label>
+              <Textarea
+                id="settings-static-targets"
+                rows={6}
+                value={staticTargetsJson}
+                onChange={(event) => setStaticTargetsJson(event.currentTarget.value)}
+                placeholder='[{"full_name": "Jane Smith", "current_company": "Acme", "current_title": "Product Manager", "confidence": 0.8}]'
+              />
+              <p className="text-xs text-muted-foreground">
+                Add people manually as JSON when you don&apos;t have LinkedIn connected. Each entry needs a name, company, title, and confidence score.
+              </p>
+            </div>
+          </div>
+        )}
 
         <Button onClick={() => void handleSave()} disabled={props.isSaving} className="gap-2">
           {props.isSaving ? "Saving settings..." : "Save Settings"}

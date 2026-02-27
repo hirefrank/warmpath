@@ -104,6 +104,7 @@ export interface DistributionPackResponse {
 export interface WarmPathSettings {
   advisor_slug: string;
   default_job_category: string;
+  default_list_limit: number;
   linkedin_li_at: string;
   linkedin_rate_limit_ms: number;
   linkedin_request_timeout_ms: number;

@@ -27,26 +27,29 @@ export function ContactsImportPanel(props: ContactsImportPanelProps) {
   return (
     <Card className="animate-fade-in-up overflow-hidden">
       <CardHeader className="border-b border-border/50 bg-accent/30">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
-              <Users className="size-4 text-primary" />
-            </div>
-            <div>
-              <CardTitle>Import Contacts</CardTitle>
-              <CardDescription>
-                Upload or paste a LinkedIn Connections CSV to import your network.
-              </CardDescription>
-            </div>
+        <div className="flex items-center gap-2.5">
+          <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+            <Users className="size-4 text-primary" />
           </div>
+          <div>
+            <CardTitle>Import Contacts</CardTitle>
+            <CardDescription>
+              Upload or paste a LinkedIn Connections CSV to import your network.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            To export: LinkedIn &rarr; Me &rarr; Settings &rarr; Data privacy &rarr; Get a copy of your data &rarr; Connections &rarr; Download.
+          </p>
           {props.contactCount > 0 && (
             <Badge variant="secondary" className="font-mono">
               {props.contactCount} imported
             </Badge>
           )}
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4 pt-5">
         <div className="space-y-2">
           <Label htmlFor="csv-file">Upload CSV file</Label>
           <label

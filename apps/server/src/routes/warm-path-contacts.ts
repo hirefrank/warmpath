@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { getDatabase } from "../db";
+import { getWarmPathSettings } from "../db/repositories/app-settings";
 import {
   findContactsByCompany,
   listContacts,
@@ -45,7 +46,8 @@ app.post("/api/warm-path/contacts/import", async (c) => {
 });
 
 app.get("/api/warm-path/contacts", (c) => {
-  const limit = Number(c.req.query("limit") ?? "200");
+  const defaultLimit = getWarmPathSettings(getDatabase()).settings.default_list_limit;
+    const limit = Number(c.req.query("limit") ?? String(defaultLimit));
   const company = c.req.query("company");
   const contacts = company
     ? findContactsByCompany(getDatabase(), company)

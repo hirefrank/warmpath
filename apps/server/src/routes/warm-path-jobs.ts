@@ -56,7 +56,8 @@ app.get("/api/warm-path/jobs", (c) => {
   const location = c.req.query("location") ?? undefined;
   const source = (c.req.query("source") as "network" | "all" | undefined) ?? undefined;
   const limitRaw = c.req.query("limit");
-  const limit = limitRaw ? Number(limitRaw) : 200;
+  const defaultLimit = getWarmPathSettings(getDatabase()).settings.default_list_limit;
+  const limit = limitRaw ? Number(limitRaw) : defaultLimit;
 
   const jobs = listJobs(getDatabase(), {
     advisorSlug,

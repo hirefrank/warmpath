@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import { Search, ChevronRight, Zap, AlertTriangle } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, Zap, AlertTriangle } from "lucide-react";
 
 interface ScoutPanelProps {
   runs: SecondDegreeScoutRun[];
@@ -33,6 +33,7 @@ export function ScoutPanel(props: ScoutPanelProps) {
   const [targetTitle, setTargetTitle] = useState("");
   const [seedLines, setSeedLines] = useState("");
   const [limit, setLimit] = useState(25);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   const parsedSeeds = useMemo(() => parseSeedLines(seedLines), [seedLines]);
   const runDiagnostics = useMemo(() => {
@@ -63,9 +64,9 @@ export function ScoutPanel(props: ScoutPanelProps) {
               <Search className="size-4 text-primary" />
             </div>
             <div>
-              <CardTitle>2nd-Degree Scout</CardTitle>
+              <CardTitle>Scout Your Network</CardTitle>
               <CardDescription>
-                Find likely 2nd-degree targets and connector paths through your network.
+                Find people at your target company who are connected to someone you know.
               </CardDescription>
             </div>
           </div>
@@ -84,7 +85,7 @@ export function ScoutPanel(props: ScoutPanelProps) {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="target-function">Function (optional)</Label>
+              <Label htmlFor="target-function">Department (optional)</Label>
               <Input
                 id="target-function"
                 value={targetFunction}
@@ -226,30 +227,42 @@ export function ScoutPanel(props: ScoutPanelProps) {
                 ) : null}
 
                 {runDiagnostics ? (
-                  <div className="rounded-lg border bg-accent/30 p-4">
-                    <h4 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      <Zap className="size-3" />
-                      Adapter Diagnostics
-                    </h4>
-                    <p className="mb-3 font-mono text-[10px] text-muted-foreground">
-                      source={runDiagnostics.source} / limit={runDiagnostics.effective_limit} / min_conf={runDiagnostics.min_confidence}
-                    </p>
-                    <div className="space-y-1">
-                      {runDiagnostics.adapter_attempts.map((attempt) => (
-                        <div key={attempt.adapter} className="flex items-center justify-between rounded-md bg-card px-3 py-2 text-xs">
-                          <span className="font-medium">{attempt.adapter}</span>
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant={attempt.status === "success" ? "default" : "outline"}
-                              className="text-[10px]"
-                            >
-                              {attempt.status}
-                            </Badge>
-                            <span className="font-mono text-muted-foreground">{attempt.result_count} hits</span>
-                          </div>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowDiagnostics(!showDiagnostics)}
+                      className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <ChevronDown className={cn("size-3.5 transition-transform", showDiagnostics && "rotate-180")} />
+                      {showDiagnostics ? "Hide details" : "Show details"}
+                    </button>
+                    {showDiagnostics && (
+                      <div className="rounded-lg border bg-accent/30 p-4 animate-fade-in-up">
+                        <h4 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          <Zap className="size-3" />
+                          Run Details
+                        </h4>
+                        <p className="mb-3 font-mono text-[10px] text-muted-foreground">
+                          source={runDiagnostics.source} / limit={runDiagnostics.effective_limit} / min_conf={runDiagnostics.min_confidence}
+                        </p>
+                        <div className="space-y-1">
+                          {runDiagnostics.adapter_attempts.map((attempt) => (
+                            <div key={attempt.adapter} className="flex items-center justify-between rounded-md bg-card px-3 py-2 text-xs">
+                              <span className="font-medium">{attempt.adapter}</span>
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  variant={attempt.status === "success" ? "default" : "outline"}
+                                  className="text-[10px]"
+                                >
+                                  {attempt.status}
+                                </Badge>
+                                <span className="font-mono text-muted-foreground">{attempt.result_count} hits</span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 ) : null}
 
@@ -318,7 +331,7 @@ function renderDiagnosticsSummaryBadge(run: SecondDegreeScoutRun) {
   }
 
   if (summary.not_configured_count === summary.adapter_count && summary.adapter_count > 0) {
-    return <Badge variant="outline" className="text-[10px]">needs config</Badge>;
+    return <Badge variant="outline" className="text-[10px]">Set up LinkedIn in Settings</Badge>;
   }
 
   return <Badge variant="outline" className="text-[10px]">no hits</Badge>;
