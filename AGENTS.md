@@ -46,6 +46,7 @@ bun run dev:client
 
 ### Start single-origin mode (UI + API on one origin)
 ```bash
+bun run dev
 bun run dev:single-origin
 ```
 

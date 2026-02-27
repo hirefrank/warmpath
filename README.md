@@ -52,29 +52,31 @@ Everything runs locally on your machine by default.
 # 1) install dependencies
 bun install
 
-# 2) start API server
-bun run dev:server
-
-# 3) start client
-bun run dev:client
+# 2) start single-origin app (UI + API)
+bun run dev
 ```
 
 Open:
 
-- App: [http://localhost:5173](http://localhost:5173)
-- API health: [http://localhost:3001/api/health](http://localhost:3001/api/health)
+- App + API: [http://localhost:3001](http://localhost:3001)
 
 ### Single-origin mode
 
 If you want one origin for UI and API:
 
 ```bash
-bun run dev:single-origin
+bun run dev
 ```
 
 Then open [http://localhost:3001](http://localhost:3001).
 
-This builds the client and serves static assets from the Hono server. For fastest UI iteration with HMR, keep using dual-process dev.
+This builds the client and serves static assets from the Hono server.
+For fastest UI iteration with HMR, use dual-process dev:
+
+```bash
+bun run dev:server
+bun run dev:client
+```
 
 ### One-command demo
 
@@ -87,15 +89,18 @@ bun run demo
 1. Install Bun.
 2. Clone this repo.
 3. Run `bun install` from repo root.
-4. Start server: `bun run dev:server`.
-5. Start client: `bun run dev:client`.
-6. Open `http://localhost:5173`.
+4. Start app: `bun run dev`.
+5. Open `http://localhost:3001`.
+6. Go to **Settings** and save your defaults and (optionally) LinkedIn cookie.
 7. Import LinkedIn contacts CSV.
 8. Pick a job, rank paths, and generate outreach assets.
 
 If you only need local/offline behavior, you can run without LinkedIn session config.
 
 ## Configuration
+
+For non-technical users, configure defaults in the in-app **Settings** panel.
+Environment variables are optional advanced overrides.
 
 ### Core
 
@@ -126,7 +131,11 @@ Without valid `LINKEDIN_LI_AT`, scout runs still work with seed/static targets a
 
 ```bash
 # single-origin local runtime
-bun run dev:single-origin
+bun run dev
+
+# dual-process dev (client HMR)
+bun run dev:server
+bun run dev:client
 
 # type checks
 bun run typecheck:server
@@ -149,6 +158,8 @@ bun run --cwd apps/client build
 
 Warm-path core:
 
+- `GET /api/warm-path/settings`
+- `PUT /api/warm-path/settings`
 - `POST /api/warm-path/rank`
 - `GET /api/warm-path/runs/:id`
 - `POST /api/warm-path/runs/:id/outreach-brief`

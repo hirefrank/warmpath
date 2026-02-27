@@ -591,6 +591,7 @@ export function OutreachPage() {
       buildPathCount={selectedScoutRun?.connector_paths.length ?? 0}
       pathCount={paths.length}
       hasDraft={draft !== null || brief !== null || messagePack !== null || distributionPack !== null}
+      settingsReady={settings !== null}
     >
       {error ? (
         <div className="mb-6 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive animate-fade-in-up" role="alert">
@@ -605,6 +606,15 @@ export function OutreachPage() {
           {buildPathHint}
         </div>
       ) : null}
+
+      {activeStep === "settings" && (
+        <SettingsPanel
+          settings={settings?.settings ?? null}
+          hints={settings?.hints ?? null}
+          isSaving={isSavingSettings}
+          onSave={handleSaveSettings}
+        />
+      )}
 
       {activeStep === "scout" && (
         <ScoutPanel

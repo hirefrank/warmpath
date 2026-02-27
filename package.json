@@ -7,6 +7,7 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "bun run dev:single-origin",
     "dev:client": "bun run --cwd apps/client dev",
     "dev:server": "bun run --cwd apps/server dev",
     "build:client": "bun run --cwd apps/client build",

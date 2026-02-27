@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import {
-  getScoutRuntimeSettings,
   getWarmPathSettings,
   updateWarmPathSettings,
 } from "../db/repositories/app-settings";
@@ -43,11 +42,6 @@ app.put("/api/warm-path/settings", async (c) => {
       500
     );
   }
-});
-
-app.get("/api/warm-path/settings/scout-runtime", (c) => {
-  const settings = getScoutRuntimeSettings(getDatabase());
-  return c.json({ settings });
 });
 
 export default app;

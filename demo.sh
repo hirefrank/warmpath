@@ -22,7 +22,7 @@ echo "- slug: $DEMO_ADVISOR_SLUG"
 echo "- cat:  $DEMO_CATEGORY"
 
 bun --cwd "$ROOT_DIR/apps/server" -e "$(cat <<'EOF'
-import app from './src/index.ts';
+import { app } from './src/index.ts';
 
 const advisorSlug = process.env.DEMO_ADVISOR_SLUG ?? 'hirefrank';
 const category = process.env.DEMO_CATEGORY ?? 'product';

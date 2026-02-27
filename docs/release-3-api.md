@@ -10,6 +10,16 @@ This document summarizes the implemented API surface for Release 3:
 
 ## Brief + Message Generation
 
+## App Settings
+
+### `GET /api/warm-path/settings`
+
+Returns persisted user-facing app settings used for scout/ranking defaults (with env/default fallbacks).
+
+### `PUT /api/warm-path/settings`
+
+Updates persisted app settings so non-technical users can configure behavior from the UI instead of `.env` files.
+
 ### `POST /api/warm-path/runs/:id/outreach-brief`
 
 Generate a structured brief for a selected ranked colleague.

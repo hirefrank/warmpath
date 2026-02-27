@@ -9,7 +9,7 @@ import warmPathRunsRoute from "./routes/warm-path-runs";
 import warmPathScoutRoute from "./routes/warm-path-scout";
 import warmPathSettingsRoute from "./routes/warm-path-settings";
 
-const app = new Hono();
+export const app = new Hono();
 const clientDistDir = path.resolve(import.meta.dir, "../../client/dist");
 const clientIndexPath = path.join(clientDistDir, "index.html");
 
@@ -70,5 +70,3 @@ if (import.meta.main) {
   Bun.serve({ port, fetch: app.fetch });
   console.log(`WarmPath server running at http://localhost:${port}`);
 }
-
-export default app;
