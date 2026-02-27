@@ -68,13 +68,13 @@ export function AppSidebar(props: AppSidebarProps) {
         <div className="relative flex flex-col gap-0.5">
           {/* Vertical connector line */}
           <div
-            className="absolute left-[22px] top-[20px] w-px bg-sidebar-border"
+            className="absolute left-[20px] top-[20px] z-0 w-px bg-sidebar-border"
             style={{ height: `calc(100% - 40px)` }}
           />
           {/* Active progress overlay */}
           {activeIndex > 0 && (
             <div
-              className="absolute left-[22px] top-[20px] w-px bg-sidebar-primary/60 transition-all duration-500"
+              className="absolute left-[20px] top-[20px] z-0 w-px bg-sidebar-primary/60 transition-all duration-500"
               style={{ height: `${activeIndex * 44}px` }}
             />
           )}
