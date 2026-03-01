@@ -1,24 +1,11 @@
-import { Hono } from "hono";
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import { getDatabase } from "./db";
-import healthRoute from "./routes/health";
-import warmPathContactsRoute from "./routes/warm-path-contacts";
-import warmPathJobsRoute from "./routes/warm-path-jobs";
-import warmPathRunsRoute from "./routes/warm-path-runs";
-import warmPathScoutRoute from "./routes/warm-path-scout";
-import warmPathSettingsRoute from "./routes/warm-path-settings";
+import { app } from "./app";
+export { app };
 
-export const app = new Hono();
 const clientDistDir = path.resolve(import.meta.dir, "../../client/dist");
 const clientIndexPath = path.join(clientDistDir, "index.html");
-
-app.route("/", healthRoute);
-app.route("/", warmPathContactsRoute);
-app.route("/", warmPathJobsRoute);
-app.route("/", warmPathRunsRoute);
-app.route("/", warmPathScoutRoute);
-app.route("/", warmPathSettingsRoute);
 
 app.get("*", (c) => {
   const requestPath = c.req.path;
@@ -52,16 +39,6 @@ app.get("*", (c) => {
   }
 
   return new Response(Bun.file(clientIndexPath));
-});
-
-app.onError((error, c) => {
-  return c.json(
-    {
-      error: "Internal server error",
-      details: error.message,
-    },
-    500
-  );
 });
 
 if (import.meta.main) {
